@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ETC Filmes · Orçamentos</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- sem dependência externa -->
 <style>
 :root {
   --bg: #f5f2eb;
@@ -268,9 +268,6 @@ let rowOverride = {};   // {id: number}
 async function init() {
   setStatus('loading', 'Conectando...');
   try {
-    // Teste de conexão explícito
-    const { data: ping, error: pingErr } = await db.from('clientes').select('count', { count: 'exact', head: true });
-    if (pingErr) throw pingErr;
     await loadClientes();
     setStatus('online', 'Online · Supabase');
   } catch(e) {
@@ -291,11 +288,7 @@ function setStatus(state, text) {
 // CLIENTES
 // =============================================
 async function loadClientes() {
-  const { data, error } = await db
-    .from('clientes')
-    .select('id, nome, servicos(count)')
-    .order('nome');
-  if (error) throw error;
+  const data = await db.select('clientes', 'select=id,nome,servicos(count)&order=nome.asc');
   allClientes = data.map(c => ({
     id: c.id,
     nome: c.nome,
@@ -334,13 +327,10 @@ async function selectCliente(id, nome) {
 }
 
 async function loadServicos() {
-  const { data, error } = await db
-    .from('servicos')
-    .select('*')
-    .eq('cliente_id', currentCliente.id)
-    .order('ordem', { ascending: true })
-    .order('id', { ascending: true });
-  if (error) { showToast('Erro ao carregar serviços', true); return; }
+  let data;
+  try {
+    data = await db.select('servicos', `select=*&cliente_id=eq.${currentCliente.id}&order=ordem.asc,id.asc`);
+  } catch(e) { showToast('Erro ao carregar serviços: ' + e.message, true); return; }
   currentServicos = data;
   // inicializa estado
   data.forEach(sv => {
@@ -549,16 +539,21 @@ async function addServico() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span>';
 
-  const { data, error } = await db.from('servicos').insert({
-    cliente_id: currentCliente.id,
-    nome, tipo, valor, por_minuto: porMin, obs,
-    ordem: currentServicos.length
-  }).select().single();
-
+  let data;
+  try {
+    const arr = await db.insert('servicos', {
+      cliente_id: currentCliente.id,
+      nome, tipo, valor, por_minuto: porMin, obs,
+      ordem: currentServicos.length
+    });
+    data = Array.isArray(arr) ? arr[0] : arr;
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '+ Adicionar';
+    showToast('Erro ao salvar: ' + e.message, true); return;
+  }
   btn.disabled = false;
   btn.textContent = '+ Adicionar';
-
-  if (error) { showToast('Erro ao salvar serviço', true); return; }
 
   currentServicos.push(data);
   rowChecked[data.id] = false;
@@ -578,8 +573,9 @@ async function addServico() {
 async function deleteServico(id) {
   if (!confirm('Remover este serviço permanentemente?')) return;
 
-  const { error } = await db.from('servicos').delete().eq('id', id);
-  if (error) { showToast('Erro ao remover', true); return; }
+  try {
+    await db.delete('servicos', id);
+  } catch(e) { showToast('Erro ao remover: ' + e.message, true); return; }
 
   currentServicos = currentServicos.filter(sv => sv.id !== id);
   delete rowChecked[id];
@@ -609,12 +605,17 @@ async function saveNewCliente() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span>';
 
-  const { data, error } = await db.from('clientes').insert({ nome }).select().single();
-
+  let data;
+  try {
+    const arr = await db.insert('clientes', { nome });
+    data = Array.isArray(arr) ? arr[0] : arr;
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Salvar';
+    showToast('Erro ao criar cliente: ' + e.message, true); return;
+  }
   btn.disabled = false;
   btn.textContent = 'Salvar';
-
-  if (error) { showToast('Erro ao criar cliente', true); return; }
 
   allClientes.push({ id: data.id, nome: data.nome, count: 0 });
   allClientes.sort((a,b) => a.nome.localeCompare(b.nome));
