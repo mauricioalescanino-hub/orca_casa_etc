@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETC Filmes · Orçamentos</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f5f2eb;
+  --card: #faf8f4;
+  --border: #e0dbd0;
+  --border2: #ccc7b8;
+  --text: #1a1814;
+  --muted: #8a8478;
+  --accent: #c8461e;
+  --accent2: #1e6bc8;
+  --green: #1e7a44;
+  --yellow: #e8a020;
+  --surface: #edeae2;
+  --red: #c8461e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+
+.topbar {
+  background: var(--text); color: var(--bg);
+  padding: 0 40px; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 200;
+}
+.brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.brand em { color: #c8461e; font-style: normal; }
+.topbar-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9a9488; display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4a4a4a; }
+.status-dot.online { background: #4caf50; }
+.status-dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 56px); }
+
+.sidebar {
+  background: var(--card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 56px; height: calc(100vh - 56px); overflow: hidden;
+}
+.sidebar-head { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); }
+.sidebar-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.search-wrap { position: relative; }
+.search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.client-search { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px 9px 32px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color .2s; }
+.client-search:focus { border-color: var(--accent); }
+.client-search::placeholder { color: var(--muted); }
+
+.sidebar-actions { padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.btn-add-client { width: 100%; padding: 8px; background: transparent; border: 1px dashed var(--border2); border-radius: 8px; color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.btn-add-client:hover { border-color: var(--accent); color: var(--accent); background: rgba(200,70,30,0.04); }
+
+.client-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+.client-list::-webkit-scrollbar { width: 3px; }
+.client-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.client-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 20px; cursor: pointer; transition: background .15s; border-left: 3px solid transparent; gap: 8px; }
+.client-item:hover { background: var(--surface); }
+.client-item.active { background: var(--surface); border-left-color: var(--accent); }
+.client-item-name { font-size: 13px; font-weight: 500; flex: 1; }
+.client-item-count { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); background: var(--border); padding: 2px 7px; border-radius: 10px; flex-shrink: 0; }
+
+.main { display: flex; flex-direction: column; }
+
+.empty-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); padding: 60px; text-align: center; }
+.empty-main .big { font-family: 'Syne', sans-serif; font-size: 56px; font-weight: 800; color: var(--border2); line-height: 1; }
+.empty-main p { font-size: 14px; max-width: 280px; line-height: 1.5; }
+
+.content { flex: 1; padding: 28px 36px; }
+
+.cliente-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+.cliente-nome { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -0.03em; line-height: 1; }
+.cliente-sub { font-size: 12px; color: var(--muted); margin-top: 5px; font-family: 'IBM Plex Mono', monospace; }
+.header-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+.minutos-bar { background: var(--text); color: var(--bg); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.min-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #9a9488; white-space: nowrap; }
+.min-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 12px; color: var(--bg); font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 500; width: 110px; outline: none; transition: border-color .2s; }
+.min-input:focus { border-color: var(--accent); }
+.min-input::placeholder { color: #5a5850; }
+.min-update-btn { background: var(--accent); color: white; border: none; border-radius: 7px; padding: 8px 16px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: opacity .2s; }
+.min-update-btn:hover { opacity: .85; }
+.aviso { display: inline-flex; align-items: center; gap: 6px; background: rgba(232,160,32,0.15); border: 1px solid rgba(232,160,32,0.3); color: #c8a020; border-radius: 6px; padding: 5px 10px; font-size: 11px; }
+
+.section-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+table { width: 100%; border-collapse: collapse; }
+thead th { background: var(--surface); padding: 9px 14px; text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+thead th:last-child, thead th.right { text-align: right; }
+thead th.center { text-align: center; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface); }
+tbody tr.selected-row { background: #fdf5f2; }
+td { padding: 10px 14px; vertical-align: middle; }
+
+.td-check { width: 40px; text-align: center; }
+.check-box { width: 19px; height: 19px; border: 2px solid var(--border2); border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; background: white; }
+.check-box.checked { background: var(--accent); border-color: var(--accent); color: white; }
+
+.svc-name-cell { font-size: 13px; font-weight: 500; }
+.svc-type-cell { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+
+.badge { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; margin-left: 5px; vertical-align: middle; }
+.badge-ad { background: #ddf0fb; color: #1260a0; }
+.badge-ld { background: #ddf5e8; color: #1e6b3a; }
+.badge-li { background: #fde8ee; color: #b02040; }
+
+.price-cell { text-align: right; width: 140px; }
+.price-edit { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+.price-input { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text); text-align: right; width: 100px; outline: none; transition: all .15s; }
+.price-input:hover { border-color: var(--border2); background: var(--surface); }
+.price-input:focus { border-color: var(--accent2); background: white; }
+.price-unit { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.subtotal-cell { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; width: 120px; color: var(--green); }
+.subtotal-cell.pending { color: var(--yellow); font-size: 11px; }
+
+.td-actions { width: 36px; text-align: center; }
+.btn-del-row { background: none; border: none; cursor: pointer; color: var(--border2); font-size: 16px; line-height: 1; padding: 4px; border-radius: 4px; transition: color .15s; display: none; }
+tbody tr:hover .btn-del-row { display: inline-block; }
+.btn-del-row:hover { color: var(--red); }
+
+/* LINHA ADICIONAR */
+.add-row td { padding: 8px 14px; }
+.add-row-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.add-input { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color .2s; }
+.add-input:focus { border-color: var(--accent); }
+.add-input::placeholder { color: var(--muted); }
+.add-input.nome { flex: 1; min-width: 160px; }
+.add-input.tipo { width: 70px; }
+.add-input.valor { width: 90px; font-family: 'IBM Plex Mono', monospace; }
+.add-check-label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.btn-confirm-add { background: var(--green); color: white; border: none; border-radius: 7px; padding: 7px 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: opacity .2s; }
+.btn-confirm-add:hover { opacity: .85; }
+.btn-confirm-add:disabled { opacity: .5; cursor: not-allowed; }
+
+.totais-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.totais-chips { display: flex; gap: 20px; }
+.totais-chip { text-align: center; }
+.chip-val { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 500; }
+.chip-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.total-grande { text-align: right; }
+.total-val { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--accent); line-height: 1; }
+.total-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 3px; }
+
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 8px; border: none; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { opacity: .85; }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border2); }
+.btn-secondary:hover { background: var(--border); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 380px; transform: translateY(16px); transition: transform .2s; }
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; margin-bottom: 20px; }
+.modal-field { margin-bottom: 14px; }
+.modal-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.modal-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color .2s; }
+.modal-input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: var(--bg); padding: 11px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; transform: translateY(80px); opacity: 0; transition: all .3s cubic-bezier(.34,1.56,.64,1); z-index: 999; pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.error { background: var(--red); }
+
+.loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">ETC <em>·</em> Orçamentos</div>
+  <div class="topbar-status">
+    <div class="status-dot loading" id="statusDot"></div>
+    <span id="statusText">Conectando...</span>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-title">Clientes</div>
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" class="client-search" placeholder="Buscar..." id="clientSearch" oninput="filterClients()" />
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-add-client" onclick="openAddClientModal()">+ Novo cliente</button>
+    </div>
+    <div class="client-list" id="clientList">
+      <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Carregando...</div>
+    </div>
+  </aside>
+
+  <main class="main" id="mainArea">
+    <div class="empty-main">
+      <div class="big">↖</div>
+      <p>Selecione um cliente para montar o orçamento</p>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL NOVO CLIENTE -->
+<div class="modal-overlay" id="modalCliente">
+  <div class="modal">
+    <div class="modal-title">Novo Cliente</div>
+    <div class="modal-field">
+      <div class="modal-label">Nome do cliente</div>
+      <input type="text" class="modal-input" id="newClienteName" placeholder="Ex: Nova Distribuidora" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalCliente')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSaveCliente" onclick="saveNewCliente()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================
+// SUPABASE
+// =============================================
+const SUPA_URL = 'https://xgyonfiierxmmthkblhb.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneW9uZmlpZXJteG10aGtibGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTMxMjksImV4cCI6MjA5MTk2OTEyOX0.43xzVuOlejF-8xQmT9HO6P_JQMYCZVWngVPgeZLw348';
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+// =============================================
+// ESTADO
+// =============================================
+let allClientes = [];   // [{id, nome, count}]
+let currentCliente = null;  // {id, nome}
+let currentServicos = [];   // [{id, nome, tipo, valor, por_minuto, obs}]
+let minutagem = 0;
+let rowChecked = {};    // {id: bool}
+let rowOverride = {};   // {id: number}
+
+// =============================================
+// INIT
+// =============================================
+async function init() {
+  setStatus('loading', 'Conectando...');
+  try {
+    await loadClientes();
+    setStatus('online', 'Online · Supabase');
+  } catch(e) {
+    setStatus('error', 'Erro de conexão');
+    showToast('Erro ao conectar. Verifique o banco.', true);
+  }
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'status-dot ' + (state === 'online' ? 'online' : state === 'loading' ? 'loading' : '');
+  txt.textContent = text;
+}
+
+// =============================================
+// CLIENTES
+// =============================================
+async function loadClientes() {
+  const { data, error } = await db
+    .from('clientes')
+    .select('id, nome, servicos(count)')
+    .order('nome');
+  if (error) throw error;
+  allClientes = data.map(c => ({
+    id: c.id,
+    nome: c.nome,
+    count: c.servicos?.[0]?.count ?? 0
+  }));
+  renderClientList();
+}
+
+function filterClients() {
+  renderClientList();
+}
+
+function renderClientList() {
+  const q = document.getElementById('clientSearch').value.toLowerCase();
+  const filtered = allClientes.filter(c => c.nome.toLowerCase().includes(q));
+  const el = document.getElementById('clientList');
+  if (!filtered.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Nenhum cliente</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(c => `
+    <div class="client-item ${currentCliente?.id === c.id ? 'active' : ''}" onclick="selectCliente(${c.id}, '${c.nome.replace(/'/g,"\\'")}')">
+      <span class="client-item-name">${c.nome}</span>
+      <span class="client-item-count">${c.count}</span>
+    </div>`).join('');
+}
+
+async function selectCliente(id, nome) {
+  currentCliente = { id, nome };
+  minutagem = 0;
+  rowChecked = {};
+  rowOverride = {};
+  renderClientList();
+  renderMainLoading();
+  await loadServicos();
+}
+
+async function loadServicos() {
+  const { data, error } = await db
+    .from('servicos')
+    .select('*')
+    .eq('cliente_id', currentCliente.id)
+    .order('ordem', { ascending: true })
+    .order('id', { ascending: true });
+  if (error) { showToast('Erro ao carregar serviços', true); return; }
+  currentServicos = data;
+  // inicializa estado
+  data.forEach(sv => {
+    if (rowChecked[sv.id] === undefined) rowChecked[sv.id] = false;
+    if (rowOverride[sv.id] === undefined) rowOverride[sv.id] = null;
+  });
+  renderMain();
+}
+
+// =============================================
+// RENDER MAIN
+// =============================================
+function renderMainLoading() {
+  document.getElementById('mainArea').innerHTML = `
+    <div class="empty-main"><div class="big" style="font-size:32px">⏳</div><p>Carregando...</p></div>`;
+}
+
+function renderMain() {
+  const svcs = currentServicos;
+  const hasPerMin = svcs.some(sv => sv.por_minuto);
+
+  const minBar = hasPerMin ? `
+    <div class="minutos-bar">
+      <span class="min-label">⏱ Duração</span>
+      <input type="number" class="min-input" id="minInput" placeholder="0" min="0" value="${minutagem || ''}" />
+      <span class="min-label">minutos</span>
+      <button class="min-update-btn" onclick="applyMinutos()">Calcular</button>
+      ${minutagem > 0 ? '' : '<span class="aviso">⚠️ Informe a duração para serviços por minuto</span>'}
+    </div>` : '';
+
+  const rows = svcs.map(sv => {
+    const checked = rowChecked[sv.id] || false;
+    const val = rowOverride[sv.id] !== null ? rowOverride[sv.id] : parseFloat(sv.valor);
+    const sub = calcSubtotal(val, sv.por_minuto);
+    const badge = getBadge(sv.nome);
+    return `
+      <tr class="${checked ? 'selected-row' : ''}" id="row-${sv.id}">
+        <td class="td-check">
+          <div class="check-box ${checked ? 'checked' : ''}" onclick="toggleRow(${sv.id})">
+            ${checked ? `<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,6 5,9 10,3"/></svg>` : ''}
+          </div>
+        </td>
+        <td>
+          <div class="svc-name-cell">${sv.nome}${badge}</div>
+          <div class="svc-type-cell">${sv.tipo || ''}${sv.obs ? ' · ' + sv.obs : ''}</div>
+        </td>
+        <td class="price-cell">
+          <div class="price-edit">
+            <span style="color:var(--muted);font-size:12px">R$</span>
+            <input type="number" class="price-input" id="price-${sv.id}" value="${val}" step="0.01"
+              oninput="onPriceChange(${sv.id})" title="Edite livremente — não altera o cadastro" />
+            ${sv.por_minuto ? `<span class="price-unit">/min</span>` : ''}
+          </div>
+        </td>
+        <td class="${sub === null ? 'subtotal-cell pending' : 'subtotal-cell'}" id="sub-${sv.id}">
+          ${sub === null ? '⏳ aguard.' : fmtCurrency(sub)}
+        </td>
+        <td class="td-actions">
+          <button class="btn-del-row" onclick="deleteServico(${sv.id})" title="Remover serviço">✕</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('mainArea').innerHTML = `
+    <div class="content">
+      <div class="cliente-header">
+        <div>
+          <div class="cliente-nome">${currentCliente.nome}</div>
+          <div class="cliente-sub">${svcs.length} serviços · edite valores livremente (não salva)</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" onclick="resetarValores()">↺ Restaurar</button>
+          <button class="btn btn-secondary" onclick="selecionarTodos()">Sel. tudo</button>
+          <button class="btn btn-primary" onclick="copiarResumo()">📋 Copiar resumo</button>
+        </div>
+      </div>
+
+      ${minBar}
+
+      <div class="section-label">Serviços cadastrados</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="center">✓</th>
+              <th>Serviço</th>
+              <th class="right">Valor unit.</th>
+              <th class="right">Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="add-row">
+              <td colspan="5">
+                <div class="add-row-form">
+                  <input type="text" class="add-input nome" id="addNome" placeholder="Nome do serviço..." />
+                  <input type="text" class="add-input tipo" id="addTipo" placeholder="Tipo" />
+                  <input type="number" class="add-input valor" id="addValor" placeholder="Valor" step="0.01" />
+                  <label class="add-check-label">
+                    <input type="checkbox" id="addPerMin" /> /min
+                  </label>
+                  <input type="text" class="add-input" style="width:130px" id="addObs" placeholder="Obs (opcional)" />
+                  <button class="btn-confirm-add" id="btnAddSvc" onclick="addServico()">+ Adicionar</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="totais-bar">
+        <div class="totais-chips">
+          <div class="totais-chip">
+            <div class="chip-val" id="statSel">0</div>
+            <div class="chip-lbl">Selecionados</div>
+          </div>
+          <div class="totais-chip">
+            <div class="chip-val" id="statMin">${minutagem || '—'}</div>
+            <div class="chip-lbl">Minutos</div>
+          </div>
+        </div>
+        <div class="total-grande">
+          <div class="total-val" id="totalVal">R$ 0,00</div>
+          <div class="total-lbl">Total estimado</div>
+        </div>
+      </div>
+    </div>`;
+
+  updateTotais();
+}
+
+// =============================================
+// AÇÕES DE ORÇAMENTO
+// =============================================
+function applyMinutos() {
+  minutagem = parseFloat(document.getElementById('minInput').value) || 0;
+  renderMain();
+}
+
+function toggleRow(id) {
+  rowChecked[id] = !rowChecked[id];
+  const row = document.getElementById(`row-${id}`);
+  const chk = row.querySelector('.check-box');
+  row.className = rowChecked[id] ? 'selected-row' : '';
+  chk.className = `check-box ${rowChecked[id] ? 'checked' : ''}`;
+  chk.innerHTML = rowChecked[id]
+    ? `<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,6 5,9 10,3"/></svg>`
+    : '';
+  updateTotais();
+}
+
+function onPriceChange(id) {
+  const val = parseFloat(document.getElementById(`price-${id}`).value) || 0;
+  rowOverride[id] = val;
+  const sv = currentServicos.find(s => s.id === id);
+  const sub = calcSubtotal(val, sv.por_minuto);
+  const cell = document.getElementById(`sub-${id}`);
+  cell.textContent = sub === null ? '⏳ aguard.' : fmtCurrency(sub);
+  cell.className = sub === null ? 'subtotal-cell pending' : 'subtotal-cell';
+  updateTotais();
+}
+
+function selecionarTodos() {
+  const allChecked = currentServicos.every(sv => rowChecked[sv.id]);
+  currentServicos.forEach(sv => { rowChecked[sv.id] = !allChecked; });
+  renderMain();
+}
+
+function resetarValores() {
+  currentServicos.forEach(sv => { rowOverride[sv.id] = null; });
+  renderMain();
+  showToast('Valores restaurados');
+}
+
+function updateTotais() {
+  let total = 0, sel = 0;
+  currentServicos.forEach(sv => {
+    if (!rowChecked[sv.id]) return;
+    sel++;
+    const val = rowOverride[sv.id] !== null ? rowOverride[sv.id] : parseFloat(sv.valor);
+    const sub = calcSubtotal(val, sv.por_minuto);
+    if (sub !== null) total += sub;
+  });
+  const s = document.getElementById('statSel');
+  const t = document.getElementById('totalVal');
+  const m = document.getElementById('statMin');
+  if (s) s.textContent = sel;
+  if (t) t.textContent = fmtCurrency(total);
+  if (m) m.textContent = minutagem || '—';
+}
+
+// =============================================
+// ADICIONAR SERVIÇO (salva no banco)
+// =============================================
+async function addServico() {
+  const nome = document.getElementById('addNome').value.trim();
+  const tipo = document.getElementById('addTipo').value.trim();
+  const valor = parseFloat(document.getElementById('addValor').value);
+  const porMin = document.getElementById('addPerMin').checked;
+  const obs = document.getElementById('addObs').value.trim();
+
+  if (!nome || isNaN(valor)) { showToast('Preencha ao menos o nome e o valor', true); return; }
+
+  const btn = document.getElementById('btnAddSvc');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>';
+
+  const { data, error } = await db.from('servicos').insert({
+    cliente_id: currentCliente.id,
+    nome, tipo, valor, por_minuto: porMin, obs,
+    ordem: currentServicos.length
+  }).select().single();
+
+  btn.disabled = false;
+  btn.textContent = '+ Adicionar';
+
+  if (error) { showToast('Erro ao salvar serviço', true); return; }
+
+  currentServicos.push(data);
+  rowChecked[data.id] = false;
+  rowOverride[data.id] = null;
+
+  // atualiza contagem na sidebar
+  const c = allClientes.find(x => x.id === currentCliente.id);
+  if (c) c.count++;
+  renderClientList();
+  renderMain();
+  showToast('✅ Serviço adicionado e salvo!');
+}
+
+// =============================================
+// DELETAR SERVIÇO
+// =============================================
+async function deleteServico(id) {
+  if (!confirm('Remover este serviço permanentemente?')) return;
+
+  const { error } = await db.from('servicos').delete().eq('id', id);
+  if (error) { showToast('Erro ao remover', true); return; }
+
+  currentServicos = currentServicos.filter(sv => sv.id !== id);
+  delete rowChecked[id];
+  delete rowOverride[id];
+
+  const c = allClientes.find(x => x.id === currentCliente.id);
+  if (c && c.count > 0) c.count--;
+  renderClientList();
+  renderMain();
+  showToast('Serviço removido');
+}
+
+// =============================================
+// NOVO CLIENTE
+// =============================================
+function openAddClientModal() {
+  document.getElementById('newClienteName').value = '';
+  document.getElementById('modalCliente').classList.add('open');
+  setTimeout(() => document.getElementById('newClienteName').focus(), 100);
+}
+
+async function saveNewCliente() {
+  const nome = document.getElementById('newClienteName').value.trim();
+  if (!nome) return;
+
+  const btn = document.getElementById('btnSaveCliente');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>';
+
+  const { data, error } = await db.from('clientes').insert({ nome }).select().single();
+
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
+
+  if (error) { showToast('Erro ao criar cliente', true); return; }
+
+  allClientes.push({ id: data.id, nome: data.nome, count: 0 });
+  allClientes.sort((a,b) => a.nome.localeCompare(b.nome));
+  closeModal('modalCliente');
+  renderClientList();
+  showToast(`✅ Cliente "${nome}" criado!`);
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// =============================================
+// COPIAR RESUMO
+// =============================================
+function copiarResumo() {
+  const selected = currentServicos.filter(sv => rowChecked[sv.id]);
+  if (!selected.length) { showToast('Selecione pelo menos um serviço'); return; }
+
+  const date = new Date().toLocaleDateString('pt-BR');
+  let lines = [`📋 ORÇAMENTO ETC FILMES — ${currentCliente.nome}`, `Data: ${date}`];
+  if (minutagem) lines.push(`Duração: ${minutagem} min`);
+  lines.push('');
+
+  let total = 0;
+  selected.forEach(sv => {
+    const val = rowOverride[sv.id] !== null ? rowOverride[sv.id] : parseFloat(sv.valor);
+    const sub = calcSubtotal(val, sv.por_minuto);
+    if (sub !== null) total += sub;
+    const subStr = sub !== null ? fmtCurrency(sub) : `${fmtCurrency(val)}/min`;
+    lines.push(`• ${sv.nome}${sv.tipo ? ` [${sv.tipo}]` : ''}: ${fmtCurrency(val)}${sv.por_minuto ? '/min' : ''} = ${subStr}`);
+  });
+
+  lines.push('');
+  lines.push(`TOTAL: ${fmtCurrency(total)}`);
+  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('✅ Resumo copiado!'));
+}
+
+// =============================================
+// HELPERS
+// =============================================
+function calcSubtotal(val, perMin) {
+  if (!perMin) return val;
+  return minutagem > 0 ? val * minutagem : null;
+}
+
+function fmtCurrency(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+}
+
+function getBadge(name) {
+  const n = name.toLowerCase();
+  if (n.includes('audiodescrição') || n.includes('(ad)')) return '<span class="badge badge-ad">AD</span>';
+  if (n.includes('descritiva') || n.includes('(ld)')) return '<span class="badge badge-ld">LD</span>';
+  if (n.includes('libras') || n.includes('(li)')) return '<span class="badge badge-li">LI</span>';
+  return '';
+}
+
+function showToast(msg, error = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (error ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+// Enter no modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  if (e.key === 'Enter' && document.getElementById('modalCliente').classList.contains('open')) saveNewCliente();
+});
+
+init();
+</script>
+</body>
+</html>
