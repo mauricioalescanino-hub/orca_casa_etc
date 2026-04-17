@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ETC Filmes · Orçamentos</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root {
   --bg: #f5f2eb;
@@ -241,7 +241,16 @@ tbody tr:hover .btn-del-row { display: inline-block; }
 const SUPA_URL = 'https://xgyonfiierxmmthkblhb.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneW9uZmlpZXJteG10aGtibGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTMxMjksImV4cCI6MjA5MTk2OTEyOX0.43xzVuOlejF-8xQmT9HO6P_JQMYCZVWngVPgeZLw348';
 const { createClient } = supabase;
-const db = createClient(SUPA_URL, SUPA_KEY);
+const db = createClient(SUPA_URL, SUPA_KEY, {
+  auth: { persistSession: false },
+  global: {
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'X-Client-Info': 'etc-orcamentos'
+    }
+  }
+});
 
 // =============================================
 // ESTADO
@@ -259,11 +268,15 @@ let rowOverride = {};   // {id: number}
 async function init() {
   setStatus('loading', 'Conectando...');
   try {
+    // Teste de conexão explícito
+    const { data: ping, error: pingErr } = await db.from('clientes').select('count', { count: 'exact', head: true });
+    if (pingErr) throw pingErr;
     await loadClientes();
     setStatus('online', 'Online · Supabase');
   } catch(e) {
+    console.error('Supabase error:', e);
     setStatus('error', 'Erro de conexão');
-    showToast('Erro ao conectar. Verifique o banco.', true);
+    showToast('Erro: ' + (e?.message || e?.toString() || 'verifique o console'), true);
   }
 }
 
