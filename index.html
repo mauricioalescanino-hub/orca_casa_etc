@@ -184,6 +184,70 @@ tbody tr:hover .btn-del-row { display: inline-block; }
 </head>
 <body>
 
+<!-- TELA DE SENHA -->
+<div id="loginScreen" style="
+  position: fixed; inset: 0; z-index: 9999;
+  background: #1a1814;
+  display: flex; align-items: center; justify-content: center;
+">
+  <div style="text-align: center; width: 100%; max-width: 360px; padding: 40px 32px;">
+    <div style="font-family:'Syne',sans-serif; font-weight:800; font-size:28px; color:#f5f2eb; letter-spacing:-0.03em; margin-bottom:6px;">
+      ETC <em style="color:#c8461e; font-style:normal;">·</em> Orçamentos
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5a5850; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:40px;">
+      Acesso restrito
+    </div>
+
+    <div style="position:relative; margin-bottom:12px;">
+      <input
+        type="password"
+        id="senhaInput"
+        placeholder="Digite a senha..."
+        onkeydown="if(event.key==='Enter') tentarLogin()"
+        style="
+          width:100%;
+          background: #242420;
+          border: 1px solid #3a3830;
+          border-radius: 10px;
+          padding: 14px 18px;
+          font-family: 'IBM Plex Sans', sans-serif;
+          font-size: 15px;
+          color: #f5f2eb;
+          outline: none;
+          transition: border-color .2s;
+          text-align: center;
+          letter-spacing: 0.15em;
+        "
+        onfocus="this.style.borderColor='#c8461e'"
+        onblur="this.style.borderColor='#3a3830'"
+      />
+    </div>
+
+    <div id="loginErro" style="
+      color: #e86d8a; font-size: 12px; font-family:'IBM Plex Mono',monospace;
+      margin-bottom: 12px; min-height: 18px; opacity:0; transition: opacity .2s;
+    ">Senha incorreta</div>
+
+    <button onclick="tentarLogin()" style="
+      width: 100%;
+      background: #c8461e;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s;
+      letter-spacing: 0.02em;
+    " onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+      Entrar
+    </button>
+  </div>
+</div>
+
+<div id="appContent" style="display:none;">
 <div class="topbar">
   <div class="brand">ETC <em>·</em> Orçamentos</div>
   <div class="topbar-status">
@@ -216,6 +280,7 @@ tbody tr:hover .btn-del-row { display: inline-block; }
     </div>
   </main>
 </div>
+</div><!-- /appContent -->
 
 <!-- MODAL NOVO CLIENTE -->
 <div class="modal-overlay" id="modalCliente">
@@ -278,6 +343,34 @@ let currentServicos = [];   // [{id, nome, tipo, valor, por_minuto, obs}]
 let minutagem = 0;
 let rowChecked = {};    // {id: bool}
 let rowOverride = {};   // {id: number}
+
+// =============================================
+// LOGIN
+// =============================================
+const SENHA_CORRETA = 'etc2025';
+
+function tentarLogin() {
+  const input = document.getElementById('senhaInput');
+  const erro = document.getElementById('loginErro');
+  if (input.value === SENHA_CORRETA) {
+    document.getElementById('loginScreen').style.opacity = '0';
+    document.getElementById('loginScreen').style.transition = 'opacity .4s';
+    setTimeout(() => {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appContent').style.display = '';
+    }, 400);
+    init();
+  } else {
+    erro.style.opacity = '1';
+    input.value = '';
+    input.style.borderColor = '#e86d8a';
+    setTimeout(() => {
+      erro.style.opacity = '0';
+      input.style.borderColor = '#3a3830';
+    }, 2000);
+    input.focus();
+  }
+}
 
 // =============================================
 // INIT
@@ -704,7 +797,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('modalCliente').classList.contains('open')) saveNewCliente();
 });
 
-init();
+document.getElementById('senhaInput').focus();
 </script>
 </body>
 </html>
