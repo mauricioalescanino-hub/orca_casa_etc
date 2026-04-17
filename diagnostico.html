@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Diagnóstico Supabase</title>
+<style>
+  body { font-family: monospace; background: #0e0e10; color: #e8e8ee; padding: 32px; }
+  h2 { color: #e8c96d; margin-bottom: 20px; }
+  .step { margin-bottom: 16px; padding: 12px 16px; border-radius: 8px; background: #17171a; border: 1px solid #2a2a30; }
+  .step .label { font-size: 12px; color: #7a7a88; margin-bottom: 6px; }
+  .step .result { font-size: 14px; }
+  .ok { color: #6de8a4; }
+  .err { color: #e86d8a; }
+  .warn { color: #e8c96d; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; margin-top: 8px; color: #aaa; }
+  button { background: #e8c96d; color: #0e0e10; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<h2>🔍 Diagnóstico · Supabase ETC Filmes</h2>
+<button onclick="runAll()">▶ Rodar diagnóstico</button>
+<div id="steps"></div>
+
+<script>
+const SUPA_URL = 'https://xgyonfiierxmmthkblhb.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneW9uZmlpZXJteG10aGtibGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTMxMjksImV4cCI6MjA5MTk2OTEyOX0.43xzVuOlejF-8xQmT9HO6P_JQMYCZVWngVPgeZLw348';
+
+const steps = document.getElementById('steps');
+
+function addStep(label, result, ok, detail='') {
+  steps.innerHTML += `
+    <div class="step">
+      <div class="label">${label}</div>
+      <div class="result ${ok === true ? 'ok' : ok === false ? 'err' : 'warn'}">
+        ${ok === true ? '✅' : ok === false ? '❌' : '⚠️'} ${result}
+      </div>
+      ${detail ? `<pre>${detail}</pre>` : ''}
+    </div>`;
+}
+
+async function runAll() {
+  steps.innerHTML = '';
+
+  // 1. Verifica se URL está acessível
+  addStep('URL do projeto', SUPA_URL, null, '');
+
+  // 2. Testa GET em clientes
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/clientes?select=id,nome&limit=5&order=nome.asc`, {
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    const status = r.status;
+    const body = await r.text();
+
+    if (r.ok) {
+      const data = JSON.parse(body);
+      addStep(`GET /clientes (status ${status})`, `${data.length} clientes encontrados`, true, JSON.stringify(data, null, 2));
+    } else {
+      addStep(`GET /clientes (status ${status})`, 'Erro na requisição', false, body);
+    }
+  } catch(e) {
+    addStep('GET /clientes', 'Falhou — ' + e.message, false, e.toString());
+  }
+
+  // 3. Testa GET em servicos
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/servicos?select=id,nome,cliente_id&limit=5`, {
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY
+      }
+    });
+    const body = await r.text();
+    if (r.ok) {
+      const data = JSON.parse(body);
+      addStep(`GET /servicos (status ${r.status})`, `${data.length} serviços encontrados`, true, JSON.stringify(data, null, 2));
+    } else {
+      addStep(`GET /servicos (status ${r.status})`, 'Erro', false, body);
+    }
+  } catch(e) {
+    addStep('GET /servicos', 'Falhou — ' + e.message, false, '');
+  }
+
+  // 4. Testa CORS headers
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/clientes?select=id&limit=1`, {
+      method: 'OPTIONS',
+      headers: { 'Origin': window.location.origin, 'apikey': SUPA_KEY }
+    });
+    const cors = r.headers.get('access-control-allow-origin');
+    addStep('CORS (Access-Control-Allow-Origin)', cors || 'header não encontrado', cors ? null : false);
+  } catch(e) {
+    addStep('CORS check', 'Erro: ' + e.message, false);
+  }
+}
+</script>
+</body>
+</html>
