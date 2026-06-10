@@ -243,6 +243,14 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 
   <div class="errbox" id="errBox"></div>
 
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <span class="card-title">📡 Radar de oportunidades · 10 criptos</span>
+      <button class="btn mini" id="btnScan">Escanear agora</button>
+    </div>
+    <div id="radarBody"><div class="sim-empty">Toque em "Escanear agora" para varrer as 10 principais criptos no tempo gráfico atual e ver onde há sinal neste momento.</div></div>
+  </div>
+
   <div class="grid">
     <!-- coluna esquerda: gráfico -->
     <div>
@@ -322,7 +330,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
     <div class="sim-stats" id="simStats"></div>
     <div class="sim-actions">
       <button class="btn" id="btnOpenSim">▶ Executar plano atual na simulação</button>
-      <span class="sim-hint" id="simHint">Quando houver sinal de COMPRA ou VENDA, clique para abrir a operação com o tamanho calculado pela regra de risco.</span>
+      <span class="sim-hint" id="simHint">Quando houver sinal de COMPRA ou VENDA, clique para abrir a operação com o tamanho calculado pela regra de risco. Taxas de 0,1% por ponta são descontadas do resultado, como numa corretora real.</span>
     </div>
     <div class="card-head"><span class="card-title">Posições abertas</span></div>
     <div id="simPositions"><div class="sim-empty">Nenhuma posição aberta.</div></div>
@@ -339,7 +347,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
       <h3>2. Como usar esta ferramenta (passo a passo)</h3>
       <ol>
         <li><b>Escolha o mercado:</b> Cripto (funciona 24h, sem cadastro) ou Ações B3 (pregão ~10h–17h, precisa do token grátis da brapi.dev).</li>
-        <li><b>Escolha o ativo:</b> clique em um dos atalhos (BTCUSDT, PETR4...) ou digite o código.</li>
+        <li><b>Escolha o ativo:</b> clique em um dos atalhos (BTCUSDT, PETR4...), digite o código — ou use o <b>📡 Radar</b> para varrer as 10 principais criptos de uma vez e ver onde há sinal agora.</li>
         <li><b>Escolha o tempo gráfico:</b> para daytrade, os mais usados são <code>5m</code> e <code>15m</code>. Tempos maiores (1h, 4h, 1d) servem para enxergar a tendência principal.</li>
         <li><b>Clique em Analisar.</b> A ferramenta busca os preços reais, calcula os indicadores e mostra o sinal: <span class="hl">COMPRA</span>, <span class="hl2">VENDA</span> ou NEUTRO/AGUARDE.</li>
         <li><b>Tendência maior conferida automaticamente:</b> a ferramenta busca também o tempo gráfico maior (ex.: 15m → 1h) e <b>bloqueia sinais contra essa maré</b>. A linha "Tendência no tempo maior" mostra o resultado. Além disso, o filtro ADX bloqueia sinais quando o mercado está de lado, e o card de <b>Backtest</b> mostra como a estratégia teria se saído nos últimos candles do ativo — prefira operar ativos/tempos com backtest positivo.</li>
@@ -407,7 +415,8 @@ const S = {
 
 const TF_CRYPTO = ['1m','5m','15m','1h','4h','1d'];
 const TF_B3 = ['1d'];   // intraday da B3 exige plano pago na brapi; diário é grátis
-const PICKS_CRYPTO = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT'];
+const HTF_MAP = { '1m': '15m', '5m': '1h', '15m': '1h', '1h': '4h', '4h': '1d', '1d': '1w' };
+const PICKS_CRYPTO = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','LTCUSDT'];
 const PICKS_B3 = ['PETR4','VALE3','ITUB4','BBDC4','BBAS3','MGLU3'];
 
 const $ = id => document.getElementById(id);
@@ -826,6 +835,28 @@ function trendOf(cs) {
   return { dir: 0, txt: 'lateral' };
 }
 
+// aplica o filtro multi-tempo a um resultado de análise (muda cls/label/sub
+// e adiciona a linha informativa) — usado pela análise principal e pelo radar
+function applyHtfGate(res, htfInfo, tf, htfName) {
+  if (res.cls === 'buy' && htfInfo.dir < 0) {
+    res.sub = `O ${tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — comprar contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
+    res.cls = 'neutral'; res.label = 'AGUARDE';
+  } else if (res.cls === 'sell' && htfInfo.dir > 0) {
+    res.sub = `O ${tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — vender contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
+    res.cls = 'neutral'; res.label = 'AGUARDE';
+  } else if (res.cls !== 'neutral' && ((res.cls === 'buy' && htfInfo.dir > 0) || (res.cls === 'sell' && htfInfo.dir < 0))) {
+    res.sub += ` O tempo maior (${htfName}) confirma a direção — sinal mais confiável.`;
+  }
+  res.votes.unshift({
+    name: `Tendência no ${htfName} (tempo maior)`,
+    value: htfInfo.txt, vote: htfInfo.dir, weight: 0,
+    expl: 'Filtro multi-tempo: operar na direção da maré maior aumenta a taxa de acerto. ' + (
+      htfInfo.dir > 0 ? `O ${htfName} está em alta — apenas compras liberadas.` :
+      htfInfo.dir < 0 ? `O ${htfName} está em baixa — apenas vendas liberadas.` :
+      `O ${htfName} está sem direção clara — sinais dos dois lados permitidos, com cautela.`),
+  });
+}
+
 /* ============================== backtest ============================== */
 // aplica os MESMOS sinais (votesAt + filtro ADX) nos candles carregados,
 // gerenciando cada trade como a simulação: stop 1,5×ATR, parcial no alvo 1
@@ -1088,6 +1119,8 @@ function money(n) {
 /* ============================== conta de simulação ============================== */
 const SIM_KEY = 'simAccount_v1';
 const SIM_START = 10000;
+const SIM_FEE = 0.001;          // 0,1% por ponta, como numa corretora real
+const REVENGE_LOCK_MIN = 30;    // minutos sem novas entradas após um stop
 
 function loadSim() {
   try {
@@ -1110,6 +1143,23 @@ function simOpen() {
     hint.innerHTML = '<span class="down">Sem plano ativo agora (sinal AGUARDE). Espere um sinal de compra ou venda.</span>';
     return;
   }
+  // trava anti-revenge: stop recente bloqueia novas entradas
+  if (S.sim.lockUntil && Date.now() < S.sim.lockUntil) {
+    const min = Math.ceil((S.sim.lockUntil - Date.now()) / 60000);
+    hint.innerHTML = `<span class="down">🛡 Trava anti-revenge: você tomou um stop há pouco. Novas entradas em ${min} min — use o tempo para anotar o que o trade ensinou, não para "recuperar".</span>`;
+    return;
+  }
+  // aviso de correlação: criptos andam juntas, mesma direção = mesma aposta dobrada
+  const corr = S.market === 'crypto'
+    ? S.sim.positions.find(p => p.market === 'crypto' && p.side === S.plan.side && p.symbol !== S.symbol)
+    : null;
+  const corrKey = S.symbol + '|' + S.plan.side;
+  if (corr && S.corrConfirm !== corrKey) {
+    S.corrConfirm = corrKey;
+    hint.innerHTML = `<span style="color:var(--yellow)">⚠ Você já está em ${corr.side.toUpperCase()} de ${corr.symbol}, e criptos se movem juntas — abrir ${S.symbol} na mesma direção praticamente dobra a mesma aposta (foi assim que seus dois stops vieram juntos). Se entende o risco, toque de novo para confirmar.</span>`;
+    return;
+  }
+  S.corrConfirm = null;
   const rp = parseFloat($('riskPct').value) || 1;
   const perUnit = Math.abs(S.plan.entry - S.plan.stop);
   if (perUnit <= 0) return;
@@ -1141,8 +1191,11 @@ function simOpen() {
 }
 
 function simCloseQty(pos, qty, price, reason) {
-  const pnl = (pos.side === 'compra' ? price - pos.entry : pos.entry - price) * qty;
+  const fee = (pos.entry + price) * qty * SIM_FEE; // taxa de entrada + saída desta parte
+  const pnl = (pos.side === 'compra' ? price - pos.entry : pos.entry - price) * qty - fee;
   S.sim.balance += pnl;
+  // trava anti-revenge: depois de um stop cheio, sem novas entradas por um tempo
+  if (reason === 'stop-loss') S.sim.lockUntil = Date.now() + REVENGE_LOCK_MIN * 60000;
   S.sim.history.unshift({
     closedAt: Date.now(), symbol: pos.symbol, market: pos.market, tf: pos.tf,
     side: pos.side, qty, entry: pos.entry, exit: price, pnl, reason,
@@ -1230,7 +1283,8 @@ function renderSim() {
     <div class="sim-stat"><div class="k">Operações fechadas</div><div class="v">${closed.length}</div></div>
     <div class="sim-stat"><div class="k">Taxa de acerto</div><div class="v ${winRate == null ? '' : winRate >= 50 ? 'up' : 'down'}">${winRate == null ? '—' : winRate.toFixed(0) + '%'}</div></div>
     <div class="sim-stat"><div class="k">R médio por trade</div><div class="v ${avgR == null ? '' : pnlCls(avgR)}">${avgR == null ? '—' : (avgR >= 0 ? '+' : '') + avgR.toFixed(2) + 'R'}</div></div>
-  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Há posições em outros ativos — analise cada um para atualizar o preço e o monitoramento de stop/alvos.</div></div>');
+  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Há posições em outros ativos — analise cada um para atualizar o preço e o monitoramento de stop/alvos.</div></div>')
+  + (sim.lockUntil && Date.now() < sim.lockUntil ? `<div class="sim-stat" style="grid-column:1/-1"><div class="k">🛡 Trava anti-revenge ativa</div><div style="font-size:11px;color:var(--yellow);line-height:1.5">Stop recente: novas entradas liberadas em ${Math.ceil((sim.lockUntil - Date.now()) / 60000)} min. Pausa faz parte do método.</div></div>` : '');
 
   // posições abertas
   if (!sim.positions.length) {
@@ -1285,6 +1339,65 @@ $('simPositions').addEventListener('click', e => {
   simManualClose(+b.dataset.close);
 });
 
+/* ============================== radar de oportunidades ============================== */
+async function scanMarket() {
+  const btn = $('btnScan');
+  btn.disabled = true; btn.textContent = 'escaneando…';
+  const tf = TF_CRYPTO.includes(S.tf) ? S.tf : '15m';
+  const htfName = HTF_MAP[tf];
+  const tasks = PICKS_CRYPTO.map(async sym => {
+    const [cs, csH] = await Promise.all([
+      fetchCrypto(sym, tf),
+      htfName ? fetchCrypto(sym, htfName).catch(() => null) : Promise.resolve(null),
+    ]);
+    if (cs.length < 60) throw new Error('poucos dados');
+    const res = analyzeSignals(cs);
+    const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+    if (htfInfo) applyHtfGate(res, htfInfo, tf, htfName);
+    return { sym, price: cs[cs.length - 1].c, res, htfInfo, bt: backtest(cs) };
+  });
+  const settled = await Promise.allSettled(tasks);
+  const rows = settled.filter(s => s.status === 'fulfilled').map(s => s.value);
+  // sinais acionáveis primeiro, depois pela força do placar
+  rows.sort((a, b) => ((b.res.cls !== 'neutral') - (a.res.cls !== 'neutral')) || Math.abs(b.res.score) - Math.abs(a.res.score));
+  renderRadar(rows, tf, htfName, settled.length - rows.length);
+  btn.disabled = false; btn.textContent = 'Escanear agora';
+}
+
+function renderRadar(rows, tf, htfName, fails) {
+  if (!rows.length) {
+    $('radarBody').innerHTML = '<div class="sim-empty">Não consegui escanear agora — verifique a conexão e tente de novo.</div>';
+    return;
+  }
+  $('radarBody').innerHTML = `<div style="overflow-x:auto"><table class="sim-table">
+    <tr><th>Ativo</th><th>Preço</th><th>Sinal (${tf})</th><th>Força</th><th>Tend. ${tf}</th><th>Tend. ${htfName}</th><th>Backtest</th></tr>
+    ${rows.map(r => {
+      const v = r.res.cls === 'buy' ? 'buy' : r.res.cls === 'sell' ? 'sell' : 'neutral';
+      const btTxt = r.bt.n ? `${r.bt.avgR >= 0 ? '+' : ''}${r.bt.avgR.toFixed(2)}R ×${r.bt.n}` : '—';
+      const btCls = r.bt.n ? (r.bt.avgR >= 0 ? 'up' : 'down') : '';
+      return `<tr data-sym="${r.sym}" style="cursor:pointer">
+        <td><b>${r.sym.replace('USDT','')}</b></td>
+        <td>${formatPrice(r.price)}</td>
+        <td><span class="vote ${v}">${r.res.label}</span></td>
+        <td class="${r.res.score > 0 ? 'up' : r.res.score < 0 ? 'down' : ''}">${r.res.score > 0 ? '+' : ''}${r.res.score}</td>
+        <td>${r.res.trendTxt}</td>
+        <td>${r.htfInfo ? r.htfInfo.txt : '—'}</td>
+        <td class="${btCls}">${btTxt}</td>
+      </tr>`;
+    }).join('')}
+  </table></div>
+  <div class="plan-note">Toque numa linha para abrir a análise completa do ativo. Backtest = R médio × nº de trades na janela; prefira ativos com R médio positivo.${fails ? ` (${fails} ativo(s) falharam no escaneamento.)` : ''} Atualizado às ${new Date().toLocaleTimeString('pt-BR')}.</div>`;
+}
+
+$('btnScan').addEventListener('click', scanMarket);
+$('radarBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-sym]'); if (!tr) return;
+  if (S.market !== 'crypto') {
+    document.querySelector('#segMarket button[data-m="crypto"]').click();
+  }
+  S.symbol = tr.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
+});
+
 /* ============================== fluxo principal ============================== */
 async function analyze(silent) {
   const sym = $('symbolInput').value.trim().toUpperCase();
@@ -1294,7 +1407,6 @@ async function analyze(silent) {
   showError('');
   try {
     // busca o tempo gráfico atual e o tempo maior (filtro de tendência) em paralelo
-    const HTF_MAP = { '1m': '15m', '5m': '1h', '15m': '1h', '1h': '4h', '4h': '1d', '1d': '1w' };
     const htfName = S.market === 'crypto' ? HTF_MAP[S.tf] : null;
     let cs, csH = null;
     if (S.market === 'crypto') {
@@ -1311,27 +1423,8 @@ async function analyze(silent) {
     const res = analyzeSignals(cs);
 
     // filtro multi-tempo: sinal contra a tendência do tempo maior é bloqueado
-    let htfInfo = null;
-    if (csH && csH.length > 60) {
-      htfInfo = trendOf(csH);
-      if (res.cls === 'buy' && htfInfo.dir < 0) {
-        res.sub = `O ${S.tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — comprar contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
-        res.cls = 'neutral'; res.label = 'AGUARDE';
-      } else if (res.cls === 'sell' && htfInfo.dir > 0) {
-        res.sub = `O ${S.tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — vender contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
-        res.cls = 'neutral'; res.label = 'AGUARDE';
-      } else if (res.cls !== 'neutral' && ((res.cls === 'buy' && htfInfo.dir > 0) || (res.cls === 'sell' && htfInfo.dir < 0))) {
-        res.sub += ` O tempo maior (${htfName}) confirma a direção — sinal mais confiável.`;
-      }
-      res.votes.unshift({
-        name: `Tendência no ${htfName} (tempo maior)`,
-        value: htfInfo.txt, vote: htfInfo.dir, weight: 0,
-        expl: 'Filtro multi-tempo: operar na direção da maré maior aumenta a taxa de acerto. ' + (
-          htfInfo.dir > 0 ? `O ${htfName} está em alta — apenas compras liberadas.` :
-          htfInfo.dir < 0 ? `O ${htfName} está em baixa — apenas vendas liberadas.` :
-          `O ${htfName} está sem direção clara — sinais dos dois lados permitidos, com cautela.`),
-      });
-    }
+    const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+    if (htfInfo) applyHtfGate(res, htfInfo, S.tf, htfName);
     $('htfTxt').textContent = htfInfo ? `${htfInfo.txt} (${htfName})` : (S.market === 'b3' ? 'indisponível na B3' : '—');
     $('htfTxt').style.color = htfInfo && htfInfo.dir > 0 ? 'var(--green)' : htfInfo && htfInfo.dir < 0 ? 'var(--red)' : 'var(--yellow)';
 
