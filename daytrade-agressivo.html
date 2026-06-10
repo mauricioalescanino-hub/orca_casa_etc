@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ETC · DayTrade Analyzer</title>
+<title>ETC · DayTrade Agressivo 🔥</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- sem dependência externa de JS · dados: api.binance.com (cripto) e brapi.dev (ações B3) -->
 <style>
@@ -15,7 +15,7 @@
   --border2: #303845;
   --text: #e8e6e1;
   --muted: #7d8694;
-  --accent: #e85d2f;
+  --accent: #e0334c;
   --green: #2ecc71;
   --green-dim: rgba(46,204,113,0.12);
   --red: #e74c3c;
@@ -202,14 +202,14 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 <body>
 
 <div class="topbar">
-  <div class="brand">ETC <em>·</em> DayTrade Analyzer <a href="daytrade-agressivo.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">🔥 modo agressivo</a></div>
+  <div class="brand">ETC <em>·</em> DayTrade 🔥AGRESSIVO <a href="daytrade.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">← modo aprendizado</a></div>
   <div class="topbar-status"><span class="status-dot" id="statusDot"></span><span id="statusTxt">aguardando</span></div>
 </div>
 
 <div class="wrap">
 
   <div class="disclaimer">
-    <strong>⚠ Aviso importante:</strong> esta ferramenta é <strong>educacional</strong> e gera análises automáticas baseadas em indicadores técnicos. Ela <strong>não é recomendação de investimento</strong>. Daytrade envolve risco alto: a maioria das pessoas que tenta perde dinheiro, principalmente no começo. Comece <strong>simulando no papel</strong> (sem dinheiro real) e nunca opere um valor cuja perda comprometeria sua vida. Leia o <a href="#guia" style="color:var(--yellow)">Guia do Iniciante</a> no fim da página.
+    <strong>🔥 MODO AGRESSIVO — laboratório de risco:</strong> filtros afrouxados, <strong>alavancagem simulada de 3×</strong>, risco padrão de 5% por trade, stops justos, sem trava anti-revenge e sem confirmação de correlação. Esta versão existe para você <strong>sentir, com dinheiro virtual, como contas quebram</strong> — e entender por que o <a href="daytrade.html" style="color:var(--yellow)">modo aprendizado</a> tem as proteções que tem. A conta de simulação daqui é separada. <strong>Jamais leve estes parâmetros para dinheiro real.</strong>
   </div>
 
   <div class="controls">
@@ -237,7 +237,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
     <button class="btn" id="btnAnalyze">Analisar</button>
     <div class="toggle-row">
       <input type="checkbox" id="autoRefresh" checked>
-      <span>Atualizar a cada 30s</span>
+      <span>Atualizar a cada 10s</span>
     </div>
   </div>
 
@@ -308,7 +308,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
         </div>
         <div class="calc-grid">
           <div class="ctl"><label>Seu capital (R$ ou $)</label><input type="number" id="capital" value="1000" min="0"></div>
-          <div class="ctl"><label>Risco por operação (%)</label><input type="number" id="riskPct" value="1" min="0.1" max="10" step="0.1"></div>
+          <div class="ctl"><label>Risco por operação (%)</label><input type="number" id="riskPct" value="5" min="0.1" max="25" step="0.1"></div>
           <div class="calc-result" id="calcResult">Preencha o capital para calcular o tamanho da posição.</div>
         </div>
       </div>
@@ -324,7 +324,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 
   <div class="card" style="margin-top:18px" id="simCard">
     <div class="card-head">
-      <span class="card-title">🎮 Conta de simulação (paper trading) — treine sem dinheiro real</span>
+      <span class="card-title">🔥 Arena agressiva (simulação) — dinheiro virtual, adrenalina real</span>
       <button class="btn mini danger" id="btnResetSim">Zerar conta</button>
     </div>
     <div class="sim-stats" id="simStats"></div>
@@ -408,7 +408,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 const S = {
   market: 'crypto',
   symbol: 'BTCUSDT',
-  tf: '15m',
+  tf: '5m',
   candles: [],          // {t,o,h,l,c,v}
   timer: null,
 };
@@ -472,7 +472,7 @@ function showError(msg) {
 function scheduleRefresh() {
   clearInterval(S.timer); S.timer = null;
   if ($('autoRefresh').checked && S.candles.length) {
-    S.timer = setInterval(() => analyze(true), 30000);
+    S.timer = setInterval(() => analyze(true), 10000);
   }
 }
 
@@ -650,7 +650,7 @@ function adxCalc(cs, p = 14) {
   return out;
 }
 
-const ADX_MIN = 18; // abaixo disso o mercado é considerado lateral e sinais são bloqueados
+const ADX_MIN = 12; // abaixo disso o mercado é considerado lateral e sinais são bloqueados
 
 function computeInd(cs) {
   const c = closes(cs);
@@ -787,10 +787,10 @@ function scoreOf(votes) {
 }
 
 function classify(score) {
-  if (score >= 40) return { cls: 'buy', label: 'COMPRA FORTE', sub: 'A grande maioria dos indicadores aponta para cima. Cenário favorável para compra — sempre com stop.' };
-  if (score >= 15) return { cls: 'buy', label: 'COMPRA', sub: 'Os indicadores pendem para o lado comprador, mas sem unanimidade. Considere entrada menor ou aguarde mais confirmação.' };
-  if (score <= -40) return { cls: 'sell', label: 'VENDA FORTE', sub: 'A grande maioria dos indicadores aponta para baixo. Se você está comprado, é sinal de saída. Não compre agora.' };
-  if (score <= -15) return { cls: 'sell', label: 'VENDA', sub: 'Os indicadores pendem para o lado vendedor. Evite comprar; se estiver posicionado, avalie reduzir ou sair.' };
+  if (score >= 30) return { cls: 'buy', label: 'COMPRA FORTE', sub: 'A grande maioria dos indicadores aponta para cima. Cenário favorável para compra — sempre com stop.' };
+  if (score >= 10) return { cls: 'buy', label: 'COMPRA', sub: 'Os indicadores pendem para o lado comprador, mas sem unanimidade. Considere entrada menor ou aguarde mais confirmação.' };
+  if (score <= -30) return { cls: 'sell', label: 'VENDA FORTE', sub: 'A grande maioria dos indicadores aponta para baixo. Se você está comprado, é sinal de saída. Não compre agora.' };
+  if (score <= -10) return { cls: 'sell', label: 'VENDA', sub: 'Os indicadores pendem para o lado vendedor. Evite comprar; se estiver posicionado, avalie reduzir ou sair.' };
   return { cls: 'neutral', label: 'AGUARDE', sub: 'Indicadores divididos ou mercado de lado. A melhor operação agora é NÃO operar — espere o mercado mostrar direção.' };
 }
 
@@ -838,12 +838,8 @@ function trendOf(cs) {
 // aplica o filtro multi-tempo a um resultado de análise (muda cls/label/sub
 // e adiciona a linha informativa) — usado pela análise principal e pelo radar
 function applyHtfGate(res, htfInfo, tf, htfName) {
-  if (res.cls === 'buy' && htfInfo.dir < 0) {
-    res.sub = `O ${tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — comprar contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
-    res.cls = 'neutral'; res.label = 'AGUARDE';
-  } else if (res.cls === 'sell' && htfInfo.dir > 0) {
-    res.sub = `O ${tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — vender contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
-    res.cls = 'neutral'; res.label = 'AGUARDE';
+  if ((res.cls === 'buy' && htfInfo.dir < 0) || (res.cls === 'sell' && htfInfo.dir > 0)) {
+    res.sub += ` ⚠ Atenção: o ${htfName} aponta ${htfInfo.txt} — você estaria operando CONTRA a maré maior. O modo agressivo não bloqueia, mas a chance de stop é bem maior.`;
   } else if (res.cls !== 'neutral' && ((res.cls === 'buy' && htfInfo.dir > 0) || (res.cls === 'sell' && htfInfo.dir < 0))) {
     res.sub += ` O tempo maior (${htfName}) confirma a direção — sinal mais confiável.`;
   }
@@ -882,10 +878,10 @@ function backtest(cs) {
     const adxV = ind.dmi.adx[i];
     if (adxV == null || adxV < ADX_MIN) continue;
     const score = scoreOf(votesAt(cs, ind, i).votes);
-    if (Math.abs(score) < 15) continue;
+    if (Math.abs(score) < 10) continue;
     const a = ind.a[i];
     if (!a) continue;
-    const entry = cs[i].c, risk = 1.5 * a;
+    const entry = cs[i].c, risk = 1.0 * a;
     pos = score > 0
       ? { side: 'compra', entry, risk, stop: entry - risk, t1: entry + 1.5 * risk, t2: entry + 2.5 * risk, size: 1, half: false, r: 0 }
       : { side: 'venda', entry, risk, stop: entry + risk, t1: entry - 1.5 * risk, t2: entry - 2.5 * risk, size: 1, half: false, r: 0 };
@@ -913,7 +909,7 @@ function buildPlan(res, cs) {
   let plan = null;
   if (res.cls === 'buy') {
     const entry = last;
-    const stop = entry - 1.5 * a;
+    const stop = entry - 1.0 * a;
     const t1 = entry + 1.5 * (entry - stop);
     const t2 = entry + 2.5 * (entry - stop);
     plan = { side: 'compra', entry, stop, t1, t2 };
@@ -925,7 +921,7 @@ function buildPlan(res, cs) {
     rows.push(['Risco / retorno', '1 : 1,5 (alvo 1) · 1 : 2,5 (alvo 2)']);
   } else if (res.cls === 'sell') {
     const entry = last;
-    const stop = entry + 1.5 * a;
+    const stop = entry + 1.0 * a;
     const t1 = entry - 1.5 * (stop - entry);
     const t2 = entry - 2.5 * (stop - entry);
     plan = { side: 'venda', entry, stop, t1, t2 };
@@ -962,7 +958,7 @@ function renderCalc() {
   const qty = perUnit > 0 ? riskMoney / perUnit : 0;
   const notional = qty * S.plan.entry;
   el.innerHTML = `Arriscando <b>${rp}%</b> (= ${money(riskMoney)}), você pode operar até <b>${qty < 1 ? qty.toFixed(6) : qty.toFixed(2)}</b> unidades (≈ ${money(notional)} de posição). Se o stop for atingido, a perda fica limitada a ${money(riskMoney)}.` +
-    (notional > cap ? ' <span class="down">Atenção: isso exigiria alavancagem — iniciante não deve usar. Limite a posição ao seu capital.</span>' : '');
+    (notional > cap ? ' <span class="down">Posição alavancada (modo agressivo permite até 3×). Lembre: alavancagem multiplica os prejuízos na mesma proporção.</span>' : '');
 }
 
 /* ============================== render: tabela de indicadores ============================== */
@@ -1117,10 +1113,10 @@ function money(n) {
 }
 
 /* ============================== conta de simulação ============================== */
-const SIM_KEY = 'simAccount_v1';
+const SIM_KEY = 'simAggro_v1';
 const SIM_START = 10000;
 const SIM_FEE = 0.001;          // 0,1% por ponta, como numa corretora real
-const REVENGE_LOCK_MIN = 30;    // minutos sem novas entradas após um stop
+const REVENGE_LOCK_MIN = 0;     // trava anti-revenge desativada no modo agressivo
 
 function loadSim() {
   try {
@@ -1149,24 +1145,13 @@ function simOpen() {
     hint.innerHTML = `<span class="down">🛡 Trava anti-revenge: você tomou um stop há pouco. Novas entradas em ${min} min — use o tempo para anotar o que o trade ensinou, não para "recuperar".</span>`;
     return;
   }
-  // aviso de correlação: criptos andam juntas, mesma direção = mesma aposta dobrada
-  const corr = S.market === 'crypto'
-    ? S.sim.positions.find(p => p.market === 'crypto' && p.side === S.plan.side && p.symbol !== S.symbol)
-    : null;
-  const corrKey = S.symbol + '|' + S.plan.side;
-  if (corr && S.corrConfirm !== corrKey) {
-    S.corrConfirm = corrKey;
-    hint.innerHTML = `<span style="color:var(--yellow)">⚠ Você já está em ${corr.side.toUpperCase()} de ${corr.symbol}, e criptos se movem juntas — abrir ${S.symbol} na mesma direção praticamente dobra a mesma aposta (foi assim que seus dois stops vieram juntos). Se entende o risco, toque de novo para confirmar.</span>`;
-    return;
-  }
-  S.corrConfirm = null;
+  // modo agressivo: sem confirmação dupla de correlação
   const rp = parseFloat($('riskPct').value) || 1;
   const perUnit = Math.abs(S.plan.entry - S.plan.stop);
   if (perUnit <= 0) return;
-  // capital livre = saldo menos o que já está alocado nas posições abertas,
-  // para que a soma das posições nunca passe do saldo (sem alavancagem)
+  // modo agressivo: alavancagem simulada — posições somadas até 3× o saldo
   const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
-  const free = S.sim.balance - allocated;
+  const free = S.sim.balance * 3 - allocated;
   if (free <= 0) {
     hint.innerHTML = '<span class="down">Todo o saldo já está alocado em posições abertas. Feche alguma posição antes de abrir outra.</span>';
     return;
