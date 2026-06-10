@@ -1109,7 +1109,7 @@ function hline(ctx, yy, w, col) {
 function formatPrice(n) {
   if (n == null || !isFinite(n)) return '—';
   const abs = Math.abs(n);
-  const dec = abs >= 1000 ? 2 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+  const dec = abs >= 1000 ? 2 : abs >= 100 ? 2 : abs >= 10 ? 3 : abs >= 1 ? 4 : abs >= 0.01 ? 5 : 8;
   return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function money(n) {
