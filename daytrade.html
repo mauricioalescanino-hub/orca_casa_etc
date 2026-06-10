@@ -1006,25 +1006,33 @@ function simCloseQty(pos, qty, price, reason) {
   pos.qty -= qty;
 }
 
-// chamado a cada atualização de dados do ativo em tela
-function simUpdate(sym, candle) {
+// chamado a cada atualização de dados do ativo em tela; percorre todos os
+// candles desde a entrada (ou desde a última checagem), de modo que stop e
+// alvos atingidos enquanto a página esteve fechada são processados retroativamente
+function simUpdate(sym, cs) {
+  const period = cs.length > 1 ? cs[1].t - cs[0].t : 0;
   let changed = false;
   for (const pos of S.sim.positions) {
     if (pos.symbol !== sym || pos.qty <= 0) continue;
-    // se a posição foi aberta no meio do candle atual, a máxima/mínima dele
-    // incluem movimento anterior à entrada — nesse caso usa só o preço atual
-    const openedThisCandle = pos.openedAt > candle.t;
-    const hi = openedThisCandle ? candle.c : candle.h;
-    const lo = openedThisCandle ? candle.c : candle.l;
-    if (pos.side === 'compra') {
-      if (lo <= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; continue; }
-      if (!pos.halfTaken && hi >= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
-      if (pos.qty > 0 && hi >= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; }
-    } else {
-      if (hi >= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; continue; }
-      if (!pos.halfTaken && lo <= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
-      if (pos.qty > 0 && lo <= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; }
+    for (const candle of cs) {
+      if (candle.t + period <= pos.openedAt) continue;          // terminou antes da entrada
+      if (pos.lastT != null && candle.t < pos.lastT) continue;  // já processado
+      // se a posição foi aberta no meio do candle, a máxima/mínima dele
+      // incluem movimento anterior à entrada — nesse caso usa só o fechamento
+      const openedThisCandle = pos.openedAt > candle.t;
+      const hi = openedThisCandle ? candle.c : candle.h;
+      const lo = openedThisCandle ? candle.c : candle.l;
+      if (pos.side === 'compra') {
+        if (lo <= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; break; }
+        if (!pos.halfTaken && hi >= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+        if (pos.qty > 0 && hi >= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; break; }
+      } else {
+        if (hi >= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; break; }
+        if (!pos.halfTaken && lo <= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+        if (pos.qty > 0 && lo <= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; break; }
+      }
     }
+    if (pos.qty > 0 && cs.length) { pos.lastT = cs[cs.length - 1].t; changed = true; }
   }
   const before = S.sim.positions.length;
   S.sim.positions = S.sim.positions.filter(p => p.qty > 0);
@@ -1167,7 +1175,7 @@ async function analyze(silent) {
     renderIndicators(res);
     buildPlan(res, cs);
     drawChart(cs, res);
-    simUpdate(sym, last);
+    simUpdate(sym, cs);
 
     const fmtL = v => formatPrice(v);
     $('srList').innerHTML =
