@@ -282,8 +282,15 @@ details.guide[open] summary::before { transform: rotate(90deg); }
           <div class="gauge-scale"><span>VENDA FORTE</span><span>NEUTRO</span><span>COMPRA FORTE</span></div>
         </div>
         <div class="trend-line"><span style="color:var(--muted)">Tendência</span><b id="trendTxt">—</b></div>
+        <div class="trend-line"><span style="color:var(--muted)">Tendência no tempo maior</span><b id="htfTxt">—</b></div>
         <div class="trend-line"><span style="color:var(--muted)">Força do sinal</span><b id="scoreTxt">—</b></div>
         <div class="trend-line"><span style="color:var(--muted)">Volatilidade (ATR)</span><b id="atrTxt">—</b></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Backtest · estratégia neste ativo</span><span class="card-title" id="btMeta"></span></div>
+        <div class="sim-stats" id="btStats"><div class="sim-empty">Faça uma análise para ver como a estratégia teria se saído neste ativo.</div></div>
+        <div class="plan-note">Resultado de aplicar os sinais desta ferramenta nos candles carregados, com a mesma gestão da simulação (stop 1,5×ATR, parcial no alvo 1, filtro ADX). Passado não garante futuro — use para comparar ativos e tempos gráficos e evitar os que a estratégia não funciona.</div>
       </div>
 
       <div class="card">
@@ -335,7 +342,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
         <li><b>Escolha o ativo:</b> clique em um dos atalhos (BTCUSDT, PETR4...) ou digite o código.</li>
         <li><b>Escolha o tempo gráfico:</b> para daytrade, os mais usados são <code>5m</code> e <code>15m</code>. Tempos maiores (1h, 4h, 1d) servem para enxergar a tendência principal.</li>
         <li><b>Clique em Analisar.</b> A ferramenta busca os preços reais, calcula os indicadores e mostra o sinal: <span class="hl">COMPRA</span>, <span class="hl2">VENDA</span> ou NEUTRO/AGUARDE.</li>
-        <li><b>Confira a tendência em um tempo maior:</b> antes de operar no 5m/15m, olhe o 1h. Operar a favor da tendência maior aumenta a chance de acerto.</li>
+        <li><b>Tendência maior conferida automaticamente:</b> a ferramenta busca também o tempo gráfico maior (ex.: 15m → 1h) e <b>bloqueia sinais contra essa maré</b>. A linha "Tendência no tempo maior" mostra o resultado. Além disso, o filtro ADX bloqueia sinais quando o mercado está de lado, e o card de <b>Backtest</b> mostra como a estratégia teria se saído nos últimos candles do ativo — prefira operar ativos/tempos com backtest positivo.</li>
         <li><b>Siga o plano:</b> se houver sinal, a ferramenta sugere <b>entrada</b>, <b>stop-loss</b> (onde sair se der errado) e <b>alvos</b> (onde realizar lucro). <span class="hl2">Nunca opere sem stop.</span></li>
         <li><b>Use a calculadora de posição:</b> informe seu capital e quanto aceita arriscar por operação (1% é o padrão prudente). Ela diz a quantidade máxima a comprar/vender.</li>
       </ol>
@@ -605,12 +612,51 @@ function pivots(cs, k = 5) {
 }
 
 /* ============================== motor de sinal ============================== */
-function analyzeSignals(cs) {
+// ADX (força da tendência) com suavização de Wilder; também retorna +DI/-DI
+function adxCalc(cs, p = 14) {
+  const n = cs.length;
+  const out = { adx: new Array(n).fill(null), pdi: new Array(n).fill(null), mdi: new Array(n).fill(null) };
+  let trS = 0, pS = 0, mS = 0, adxPrev = null, dxSum = 0, dxCount = 0;
+  for (let i = 1; i < n; i++) {
+    const up = cs[i].h - cs[i - 1].h, dn = cs[i - 1].l - cs[i].l;
+    const pdm = (up > dn && up > 0) ? up : 0;
+    const mdm = (dn > up && dn > 0) ? dn : 0;
+    const tr = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    if (i <= p) { trS += tr; pS += pdm; mS += mdm; }
+    else { trS += tr - trS / p; pS += pdm - pS / p; mS += mdm - mS / p; }
+    if (i >= p) {
+      const pdi = trS > 0 ? 100 * pS / trS : 0;
+      const mdi = trS > 0 ? 100 * mS / trS : 0;
+      out.pdi[i] = pdi; out.mdi[i] = mdi;
+      const dx = (pdi + mdi) > 0 ? 100 * Math.abs(pdi - mdi) / (pdi + mdi) : 0;
+      if (dxCount < p) {
+        dxSum += dx; dxCount++;
+        if (dxCount === p) { adxPrev = dxSum / p; out.adx[i] = adxPrev; }
+      } else {
+        adxPrev = (adxPrev * (p - 1) + dx) / p;
+        out.adx[i] = adxPrev;
+      }
+    }
+  }
+  return out;
+}
+
+const ADX_MIN = 18; // abaixo disso o mercado é considerado lateral e sinais são bloqueados
+
+function computeInd(cs) {
   const c = closes(cs);
-  const i = c.length - 1;
-  const e9 = ema(c, 9), e21 = ema(c, 21), e50 = ema(c, 50);
-  const r = rsi(c), m = macd(c), bb = bollinger(c), st = stochastic(cs), a = atr(cs), vw = vwap(cs);
-  const last = c[i];
+  return {
+    c, e9: ema(c, 9), e21: ema(c, 21), e50: ema(c, 50),
+    r: rsi(c), m: macd(c), bb: bollinger(c), st: stochastic(cs),
+    a: atr(cs), vw: vwap(cs), dmi: adxCalc(cs),
+  };
+}
+
+// votos dos indicadores na posição i — usa apenas dados até i, por isso a
+// mesma função serve para o sinal ao vivo e para o backtest
+function votesAt(cs, ind, i) {
+  const { e9, e21, e50, r, m, bb, st, vw } = ind;
+  const last = ind.c[i];
   const fmt = n => formatPrice(n);
 
   const votes = [];
@@ -703,7 +749,8 @@ function analyzeSignals(cs) {
 
   // 7) Volume (peso 10)
   {
-    const volAvg = cs.slice(-21, -1).reduce((s, x) => s + x.v, 0) / 20;
+    const volWin = cs.slice(Math.max(0, i - 20), i);
+    const volAvg = volWin.length ? volWin.reduce((s, x) => s + x.v, 0) / volWin.length : 0;
     const lastVol = cs[i].v;
     const bull = cs[i].c >= cs[i].o;
     let v = 0, ex;
@@ -721,18 +768,110 @@ function analyzeSignals(cs) {
     votes.push({ name: 'Volume', value: volAvg > 0 ? `${(lastVol / volAvg).toFixed(1)}× a média` : '—', vote: v, weight: 10, expl: ex });
   }
 
-  // score final -100..100
+  return { votes, trendTxt };
+}
+
+// score -100..100 (ignora linhas informativas de peso 0)
+function scoreOf(votes) {
   const totalW = votes.reduce((s, x) => s + x.weight, 0);
-  const score = Math.round(votes.reduce((s, x) => s + x.vote * x.weight, 0) / totalW * 100);
+  return totalW ? Math.round(votes.reduce((s, x) => s + x.vote * x.weight, 0) / totalW * 100) : 0;
+}
 
-  let cls, label, sub;
-  if (score >= 40) { cls = 'buy'; label = 'COMPRA FORTE'; sub = 'A grande maioria dos indicadores aponta para cima. Se a tendência do tempo gráfico maior também for de alta, é um cenário favorável para compra — sempre com stop.'; }
-  else if (score >= 15) { cls = 'buy'; label = 'COMPRA'; sub = 'Os indicadores pendem para o lado comprador, mas sem unanimidade. Considere entrada menor ou aguarde mais confirmação.'; }
-  else if (score <= -40) { cls = 'sell'; label = 'VENDA FORTE'; sub = 'A grande maioria dos indicadores aponta para baixo. Se você está comprado, é sinal de saída. Não compre agora.'; }
-  else if (score <= -15) { cls = 'sell'; label = 'VENDA'; sub = 'Os indicadores pendem para o lado vendedor. Evite comprar; se estiver posicionado, avalie reduzir ou sair.'; }
-  else { cls = 'neutral'; label = 'AGUARDE'; sub = 'Indicadores divididos ou mercado de lado. A melhor operação agora é NÃO operar — espere o mercado mostrar direção.'; }
+function classify(score) {
+  if (score >= 40) return { cls: 'buy', label: 'COMPRA FORTE', sub: 'A grande maioria dos indicadores aponta para cima. Cenário favorável para compra — sempre com stop.' };
+  if (score >= 15) return { cls: 'buy', label: 'COMPRA', sub: 'Os indicadores pendem para o lado comprador, mas sem unanimidade. Considere entrada menor ou aguarde mais confirmação.' };
+  if (score <= -40) return { cls: 'sell', label: 'VENDA FORTE', sub: 'A grande maioria dos indicadores aponta para baixo. Se você está comprado, é sinal de saída. Não compre agora.' };
+  if (score <= -15) return { cls: 'sell', label: 'VENDA', sub: 'Os indicadores pendem para o lado vendedor. Evite comprar; se estiver posicionado, avalie reduzir ou sair.' };
+  return { cls: 'neutral', label: 'AGUARDE', sub: 'Indicadores divididos ou mercado de lado. A melhor operação agora é NÃO operar — espere o mercado mostrar direção.' };
+}
 
-  return { votes, score, cls, label, sub, trendTxt, e9, e21, e50, bb, r, atr: a[i], vw, piv: pivots(cs) };
+function analyzeSignals(cs) {
+  const ind = computeInd(cs);
+  const i = cs.length - 1;
+  const { votes, trendTxt } = votesAt(cs, ind, i);
+  const score = scoreOf(votes);
+  let { cls, label, sub } = classify(score);
+
+  // filtro anti-mercado-lateral: ADX fraco bloqueia compra/venda
+  const adxV = ind.dmi.adx[i];
+  if (adxV != null && adxV < ADX_MIN && cls !== 'neutral') {
+    sub = `O placar dos indicadores era de ${label}, mas o ADX está em ${adxV.toFixed(0)} (abaixo de ${ADX_MIN}): mercado de lado, onde a maioria dos sinais falha. Filtro de segurança ativado — aguarde o mercado destravar.`;
+    cls = 'neutral'; label = 'AGUARDE';
+  }
+  votes.push({
+    name: 'Força da tendência (ADX 14)',
+    value: adxV != null ? adxV.toFixed(1) : '—',
+    vote: 0, weight: 0,
+    expl: adxV == null ? 'Sem dados suficientes para calcular.'
+      : adxV < ADX_MIN ? `Abaixo de ${ADX_MIN}: tendência fraca, mercado de lado. O filtro de segurança bloqueia compras e vendas nessa condição.`
+      : adxV < 25 ? 'Tendência ganhando força — sinais liberados.'
+      : 'Tendência forte em andamento — sinais a favor dela são os mais confiáveis.',
+  });
+
+  return { votes, score, cls, label, sub, trendTxt, adxV, e9: ind.e9, e21: ind.e21, e50: ind.e50, bb: ind.bb, r: ind.r, atr: ind.a[i], vw: ind.vw, piv: pivots(cs) };
+}
+
+// tendência resumida de uma série (usada para o tempo gráfico maior)
+function trendOf(cs) {
+  const c = closes(cs);
+  const i = c.length - 1;
+  const e9v = ema(c, 9)[i], e21a = ema(c, 21), e50v = ema(c, 50)[i];
+  const e21v = e21a[i], slope = e21v != null && e21a[i - 3] != null ? e21v - e21a[i - 3] : 0;
+  const last = c[i];
+  if (e9v == null || e21v == null || e50v == null) return { dir: 0, txt: 'indefinida' };
+  if (e9v > e21v && e21v > e50v && last > e21v) return { dir: 1, txt: 'ALTA' };
+  if (e9v < e21v && e21v < e50v && last < e21v) return { dir: -1, txt: 'BAIXA' };
+  if (e9v > e21v && slope > 0) return { dir: 0.5, txt: 'alta moderada' };
+  if (e9v < e21v && slope < 0) return { dir: -0.5, txt: 'baixa moderada' };
+  return { dir: 0, txt: 'lateral' };
+}
+
+/* ============================== backtest ============================== */
+// aplica os MESMOS sinais (votesAt + filtro ADX) nos candles carregados,
+// gerenciando cada trade como a simulação: stop 1,5×ATR, parcial no alvo 1
+// com stop movido para a entrada, saída no alvo 2 ou no stop
+function backtest(cs) {
+  const ind = computeInd(cs);
+  const results = [];
+  let pos = null;
+  for (let i = 60; i < cs.length; i++) {
+    if (pos) {
+      const hi = cs[i].h, lo = cs[i].l;
+      if (pos.side === 'compra') {
+        if (lo <= pos.stop) { pos.r += pos.size * ((pos.stop - pos.entry) / pos.risk); results.push(pos.r); pos = null; continue; }
+        if (!pos.half && hi >= pos.t1) { pos.r += 0.5 * 1.5; pos.size = 0.5; pos.half = true; pos.stop = pos.entry; }
+        if (hi >= pos.t2) { pos.r += pos.size * 2.5; results.push(pos.r); pos = null; }
+      } else {
+        if (hi >= pos.stop) { pos.r += pos.size * ((pos.entry - pos.stop) / pos.risk); results.push(pos.r); pos = null; continue; }
+        if (!pos.half && lo <= pos.t1) { pos.r += 0.5 * 1.5; pos.size = 0.5; pos.half = true; pos.stop = pos.entry; }
+        if (lo <= pos.t2) { pos.r += pos.size * 2.5; results.push(pos.r); pos = null; }
+      }
+      continue;
+    }
+    const adxV = ind.dmi.adx[i];
+    if (adxV == null || adxV < ADX_MIN) continue;
+    const score = scoreOf(votesAt(cs, ind, i).votes);
+    if (Math.abs(score) < 15) continue;
+    const a = ind.a[i];
+    if (!a) continue;
+    const entry = cs[i].c, risk = 1.5 * a;
+    pos = score > 0
+      ? { side: 'compra', entry, risk, stop: entry - risk, t1: entry + 1.5 * risk, t2: entry + 2.5 * risk, size: 1, half: false, r: 0 }
+      : { side: 'venda', entry, risk, stop: entry + risk, t1: entry - 1.5 * risk, t2: entry - 2.5 * risk, size: 1, half: false, r: 0 };
+  }
+  if (pos) { // trade ainda aberto no fim da janela: fecha no último preço
+    const last = cs[cs.length - 1].c;
+    pos.r += pos.size * ((pos.side === 'compra' ? last - pos.entry : pos.entry - last) / pos.risk);
+    results.push(pos.r);
+  }
+  const n = results.length;
+  const totalR = results.reduce((s, r) => s + r, 0);
+  return {
+    n,
+    winRate: n ? results.filter(r => r > 0).length / n * 100 : null,
+    totalR,
+    avgR: n ? totalR / n : null,
+  };
 }
 
 /* ============================== plano de operação ============================== */
@@ -1154,11 +1293,61 @@ async function analyze(silent) {
   if (!silent) setStatus('loading', 'buscando dados…');
   showError('');
   try {
-    const cs = S.market === 'crypto' ? await fetchCrypto(sym, S.tf) : await fetchB3(sym, S.tf);
+    // busca o tempo gráfico atual e o tempo maior (filtro de tendência) em paralelo
+    const HTF_MAP = { '1m': '15m', '5m': '1h', '15m': '1h', '1h': '4h', '4h': '1d', '1d': '1w' };
+    const htfName = S.market === 'crypto' ? HTF_MAP[S.tf] : null;
+    let cs, csH = null;
+    if (S.market === 'crypto') {
+      [cs, csH] = await Promise.all([
+        fetchCrypto(sym, S.tf),
+        htfName ? fetchCrypto(sym, htfName).catch(() => null) : Promise.resolve(null),
+      ]);
+    } else {
+      cs = await fetchB3(sym, S.tf);
+    }
     if (cs.length < 60) throw new Error('Poucos dados para análise confiável (mínimo 60 candles).');
     S.candles = cs;
 
     const res = analyzeSignals(cs);
+
+    // filtro multi-tempo: sinal contra a tendência do tempo maior é bloqueado
+    let htfInfo = null;
+    if (csH && csH.length > 60) {
+      htfInfo = trendOf(csH);
+      if (res.cls === 'buy' && htfInfo.dir < 0) {
+        res.sub = `O ${S.tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — comprar contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
+        res.cls = 'neutral'; res.label = 'AGUARDE';
+      } else if (res.cls === 'sell' && htfInfo.dir > 0) {
+        res.sub = `O ${S.tf} deu sinal de ${res.label}, mas a tendência no ${htfName} é de ${htfInfo.txt} — vender contra a maré do tempo maior falha muito mais. Sinal bloqueado; aguarde alinhamento.`;
+        res.cls = 'neutral'; res.label = 'AGUARDE';
+      } else if (res.cls !== 'neutral' && ((res.cls === 'buy' && htfInfo.dir > 0) || (res.cls === 'sell' && htfInfo.dir < 0))) {
+        res.sub += ` O tempo maior (${htfName}) confirma a direção — sinal mais confiável.`;
+      }
+      res.votes.unshift({
+        name: `Tendência no ${htfName} (tempo maior)`,
+        value: htfInfo.txt, vote: htfInfo.dir, weight: 0,
+        expl: 'Filtro multi-tempo: operar na direção da maré maior aumenta a taxa de acerto. ' + (
+          htfInfo.dir > 0 ? `O ${htfName} está em alta — apenas compras liberadas.` :
+          htfInfo.dir < 0 ? `O ${htfName} está em baixa — apenas vendas liberadas.` :
+          `O ${htfName} está sem direção clara — sinais dos dois lados permitidos, com cautela.`),
+      });
+    }
+    $('htfTxt').textContent = htfInfo ? `${htfInfo.txt} (${htfName})` : (S.market === 'b3' ? 'indisponível na B3' : '—');
+    $('htfTxt').style.color = htfInfo && htfInfo.dir > 0 ? 'var(--green)' : htfInfo && htfInfo.dir < 0 ? 'var(--red)' : 'var(--yellow)';
+
+    // backtest da estratégia na janela carregada
+    const bt = backtest(cs);
+    $('btMeta').textContent = `${cs.length} candles · ${S.tf}`;
+    if (!bt.n) {
+      $('btStats').innerHTML = '<div class="sim-empty">Nenhum trade gerado nesta janela — os filtros não liberaram entradas (ou há poucos dados).</div>';
+    } else {
+      const cTot = bt.totalR > 0 ? 'up' : bt.totalR < 0 ? 'down' : 'flat';
+      $('btStats').innerHTML = `
+        <div class="sim-stat"><div class="k">Trades</div><div class="v">${bt.n}</div></div>
+        <div class="sim-stat"><div class="k">Acerto</div><div class="v ${bt.winRate >= 50 ? 'up' : 'down'}">${bt.winRate.toFixed(0)}%</div></div>
+        <div class="sim-stat"><div class="k">Total</div><div class="v ${cTot}">${bt.totalR >= 0 ? '+' : ''}${bt.totalR.toFixed(1)}R</div></div>
+        <div class="sim-stat"><div class="k">R médio</div><div class="v ${bt.avgR >= 0 ? 'up' : 'down'}">${bt.avgR >= 0 ? '+' : ''}${bt.avgR.toFixed(2)}R</div></div>`;
+    }
     const last = cs[cs.length - 1], prev = cs[cs.length - 2];
     const chg = (last.c - prev.c) / prev.c * 100;
 
