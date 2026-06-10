@@ -971,13 +971,19 @@ function simOpen() {
     hint.innerHTML = '<span class="down">Sem plano ativo agora (sinal AGUARDE). Espere um sinal de compra ou venda.</span>';
     return;
   }
-  const cap = S.sim.balance;
   const rp = parseFloat($('riskPct').value) || 1;
   const perUnit = Math.abs(S.plan.entry - S.plan.stop);
   if (perUnit <= 0) return;
-  let qty = (cap * rp / 100) / perUnit;
-  // sem alavancagem na simulação: posição limitada ao saldo
-  if (qty * S.plan.entry > cap) qty = cap / S.plan.entry;
+  // capital livre = saldo menos o que já está alocado nas posições abertas,
+  // para que a soma das posições nunca passe do saldo (sem alavancagem)
+  const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
+  const free = S.sim.balance - allocated;
+  if (free <= 0) {
+    hint.innerHTML = '<span class="down">Todo o saldo já está alocado em posições abertas. Feche alguma posição antes de abrir outra.</span>';
+    return;
+  }
+  let qty = (S.sim.balance * rp / 100) / perUnit;
+  if (qty * S.plan.entry > free) qty = free / S.plan.entry;
   if (qty <= 0) {
     hint.innerHTML = '<span class="down">Saldo insuficiente. Zere a conta para recomeçar.</span>';
     return;
