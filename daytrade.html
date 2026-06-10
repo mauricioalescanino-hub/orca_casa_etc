@@ -175,6 +175,25 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 .guide-body code { background: var(--surface); padding: 1px 6px; border-radius: 4px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
 
 .errbox { background: var(--red-dim); border: 1px solid rgba(231,76,60,0.4); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #f0a8a0; margin-bottom: 16px; display: none; line-height: 1.55; }
+
+/* ---------- simulação ---------- */
+.sim-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.sim-stat { background: var(--card); padding: 14px 18px; }
+.sim-stat .k { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.sim-stat .v { font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 600; }
+.sim-actions { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sim-hint { font-size: 12px; color: var(--muted); }
+.sim-table { width: 100%; border-collapse: collapse; }
+.sim-table th { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 500; }
+.sim-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12px; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.sim-table tr:last-child td { border-bottom: none; }
+.sim-empty { padding: 16px 18px; font-size: 12.5px; color: var(--muted); }
+.btn.mini { padding: 5px 12px; font-size: 11px; }
+.btn.danger { background: transparent; border: 1px solid rgba(231,76,60,0.5); color: var(--red); }
+.btn.danger:hover { background: var(--red-dim); }
+.badge-side { display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .06em; padding: 2px 8px; border-radius: 10px; }
+.badge-side.buy { color: var(--green); background: var(--green-dim); }
+.badge-side.sell { color: var(--red); background: var(--red-dim); }
 .empty-chart { padding: 80px 20px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
 .sr-list { padding: 4px 18px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted); line-height: 1.9; }
 .sr-list b.res { color: var(--red); } .sr-list b.sup { color: var(--green); }
@@ -288,6 +307,22 @@ details.guide[open] summary::before { transform: rotate(90deg); }
     </div>
   </div>
 
+  <div class="card" style="margin-top:18px" id="simCard">
+    <div class="card-head">
+      <span class="card-title">🎮 Conta de simulação (paper trading) — treine sem dinheiro real</span>
+      <button class="btn mini danger" id="btnResetSim">Zerar conta</button>
+    </div>
+    <div class="sim-stats" id="simStats"></div>
+    <div class="sim-actions">
+      <button class="btn" id="btnOpenSim">▶ Executar plano atual na simulação</button>
+      <span class="sim-hint" id="simHint">Quando houver sinal de COMPRA ou VENDA, clique para abrir a operação com o tamanho calculado pela regra de risco.</span>
+    </div>
+    <div class="card-head"><span class="card-title">Posições abertas</span></div>
+    <div id="simPositions"><div class="sim-empty">Nenhuma posição aberta.</div></div>
+    <div class="card-head"><span class="card-title">Histórico de operações</span></div>
+    <div id="simHistory"><div class="sim-empty">Nenhuma operação fechada ainda. Sua taxa de acerto aparecerá aqui.</div></div>
+  </div>
+
   <details class="guide" id="guia">
     <summary>📖 Guia do Iniciante — leia antes de operar</summary>
     <div class="guide-body">
@@ -343,7 +378,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 
       <h3>7. Rotina sugerida para começar</h3>
       <ol>
-        <li>Por 30 dias, use a ferramenta <b>somente em simulação</b>: anote cada sinal que seguiria, entrada, stop, alvo e resultado.</li>
+        <li>Por 30 dias, use <b>somente a Conta de Simulação</b> desta página: quando houver sinal, clique em "Executar plano atual na simulação" e deixe a ferramenta acompanhar stop e alvos com saldo virtual de 10.000.</li>
         <li>Calcule sua taxa de acerto e seu risco/retorno médio no fim do mês.</li>
         <li>Só passe para dinheiro real se o resultado simulado for consistentemente positivo — e comece com pouco.</li>
       </ol>
@@ -911,6 +946,192 @@ function money(n) {
   return (S.market === 'b3' ? 'R$ ' : '$ ') + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/* ============================== conta de simulação ============================== */
+const SIM_KEY = 'simAccount_v1';
+const SIM_START = 10000;
+
+function loadSim() {
+  try {
+    const j = JSON.parse(localStorage.getItem(SIM_KEY));
+    if (j && typeof j.balance === 'number' && Array.isArray(j.positions) && Array.isArray(j.history)) return j;
+  } catch (e) {}
+  return { balance: SIM_START, positions: [], history: [] };
+}
+function saveSim() { localStorage.setItem(SIM_KEY, JSON.stringify(S.sim)); }
+
+function fmtQty(q) { return q >= 100 ? q.toFixed(0) : q >= 1 ? q.toFixed(2) : q.toFixed(6); }
+function moneyFor(market, n) {
+  const sign = n < 0 ? '−' : '';
+  return sign + (market === 'b3' ? 'R$ ' : '$ ') + Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function simOpen() {
+  const hint = $('simHint');
+  if (!S.plan || !S.candles.length) {
+    hint.innerHTML = '<span class="down">Sem plano ativo agora (sinal AGUARDE). Espere um sinal de compra ou venda.</span>';
+    return;
+  }
+  const cap = S.sim.balance;
+  const rp = parseFloat($('riskPct').value) || 1;
+  const perUnit = Math.abs(S.plan.entry - S.plan.stop);
+  if (perUnit <= 0) return;
+  let qty = (cap * rp / 100) / perUnit;
+  // sem alavancagem na simulação: posição limitada ao saldo
+  if (qty * S.plan.entry > cap) qty = cap / S.plan.entry;
+  if (qty <= 0) {
+    hint.innerHTML = '<span class="down">Saldo insuficiente. Zere a conta para recomeçar.</span>';
+    return;
+  }
+  const pos = {
+    id: Date.now(),
+    symbol: S.symbol, market: S.market, tf: S.tf,
+    side: S.plan.side,                       // 'compra' | 'venda'
+    qty, entry: S.plan.entry, stop: S.plan.stop, t1: S.plan.t1, t2: S.plan.t2,
+    riskPerUnit: perUnit, halfTaken: false,
+    openedAt: Date.now(),
+  };
+  S.sim.positions.push(pos);
+  saveSim(); renderSim();
+  hint.innerHTML = `<span class="up">Posição aberta: ${pos.side.toUpperCase()} ${fmtQty(qty)} ${pos.symbol}. O stop e os alvos serão monitorados automaticamente a cada atualização.</span>`;
+}
+
+function simCloseQty(pos, qty, price, reason) {
+  const pnl = (pos.side === 'compra' ? price - pos.entry : pos.entry - price) * qty;
+  S.sim.balance += pnl;
+  S.sim.history.unshift({
+    closedAt: Date.now(), symbol: pos.symbol, market: pos.market, tf: pos.tf,
+    side: pos.side, qty, entry: pos.entry, exit: price, pnl, reason,
+    r: pos.riskPerUnit > 0 ? pnl / (pos.riskPerUnit * qty) : 0,
+  });
+  pos.qty -= qty;
+}
+
+// chamado a cada atualização de dados do ativo em tela
+function simUpdate(sym, candle) {
+  let changed = false;
+  for (const pos of S.sim.positions) {
+    if (pos.symbol !== sym || pos.qty <= 0) continue;
+    // se a posição foi aberta no meio do candle atual, a máxima/mínima dele
+    // incluem movimento anterior à entrada — nesse caso usa só o preço atual
+    const openedThisCandle = pos.openedAt > candle.t;
+    const hi = openedThisCandle ? candle.c : candle.h;
+    const lo = openedThisCandle ? candle.c : candle.l;
+    if (pos.side === 'compra') {
+      if (lo <= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; continue; }
+      if (!pos.halfTaken && hi >= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+      if (pos.qty > 0 && hi >= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; }
+    } else {
+      if (hi >= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; continue; }
+      if (!pos.halfTaken && lo <= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+      if (pos.qty > 0 && lo <= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; }
+    }
+  }
+  const before = S.sim.positions.length;
+  S.sim.positions = S.sim.positions.filter(p => p.qty > 0);
+  if (changed || S.sim.positions.length !== before) saveSim();
+  renderSim();
+}
+
+function simManualClose(id) {
+  const pos = S.sim.positions.find(p => p.id === id);
+  if (!pos) return;
+  if (pos.symbol !== S.symbol || !S.candles.length) {
+    $('simHint').innerHTML = `<span class="down">Para fechar ${pos.symbol} manualmente, primeiro analise esse ativo (preciso do preço atual).</span>`;
+    return;
+  }
+  simCloseQty(pos, pos.qty, S.candles[S.candles.length - 1].c, 'manual');
+  S.sim.positions = S.sim.positions.filter(p => p.qty > 0);
+  saveSim(); renderSim();
+}
+
+function simReset() {
+  if (!confirm('Zerar a conta de simulação? Posições e histórico serão apagados e o saldo volta para 10.000.')) return;
+  S.sim = { balance: SIM_START, positions: [], history: [] };
+  saveSim(); renderSim();
+}
+
+function renderSim() {
+  const sim = S.sim;
+  const lastPrice = S.candles.length ? S.candles[S.candles.length - 1].c : null;
+
+  // P&L aberto (só calculável para o ativo em tela)
+  let openPnl = 0, openPnlKnown = true;
+  for (const p of sim.positions) {
+    if (p.symbol === S.symbol && lastPrice != null) {
+      openPnl += (p.side === 'compra' ? lastPrice - p.entry : p.entry - lastPrice) * p.qty;
+    } else openPnlKnown = false;
+  }
+
+  const closed = sim.history;
+  const wins = closed.filter(h => h.pnl > 0).length;
+  const winRate = closed.length ? (wins / closed.length * 100) : null;
+  const totalPnl = sim.balance - SIM_START + (sim.positions.length === 0 ? 0 : 0);
+  const avgR = closed.length ? closed.reduce((s, h) => s + h.r, 0) / closed.length : null;
+  const pnlCls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+  const cur = S.market === 'b3' ? 'b3' : 'crypto';
+
+  $('simStats').innerHTML = `
+    <div class="sim-stat"><div class="k">Saldo (realizado)</div><div class="v ${pnlCls(sim.balance - SIM_START)}">${moneyFor(cur, sim.balance)}</div></div>
+    <div class="sim-stat"><div class="k">Resultado total</div><div class="v ${pnlCls(totalPnl)}">${totalPnl >= 0 ? '+' : ''}${moneyFor(cur, totalPnl)} (${(totalPnl / SIM_START * 100).toFixed(2)}%)</div></div>
+    <div class="sim-stat"><div class="k">P&L aberto${openPnlKnown ? '' : ' *'}</div><div class="v ${pnlCls(openPnl)}">${sim.positions.length ? (openPnl >= 0 ? '+' : '') + moneyFor(cur, openPnl) : '—'}</div></div>
+    <div class="sim-stat"><div class="k">Operações fechadas</div><div class="v">${closed.length}</div></div>
+    <div class="sim-stat"><div class="k">Taxa de acerto</div><div class="v ${winRate == null ? '' : winRate >= 50 ? 'up' : 'down'}">${winRate == null ? '—' : winRate.toFixed(0) + '%'}</div></div>
+    <div class="sim-stat"><div class="k">R médio por trade</div><div class="v ${avgR == null ? '' : pnlCls(avgR)}">${avgR == null ? '—' : (avgR >= 0 ? '+' : '') + avgR.toFixed(2) + 'R'}</div></div>
+  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Há posições em outros ativos — analise cada um para atualizar o preço e o monitoramento de stop/alvos.</div></div>');
+
+  // posições abertas
+  if (!sim.positions.length) {
+    $('simPositions').innerHTML = '<div class="sim-empty">Nenhuma posição aberta.</div>';
+  } else {
+    $('simPositions').innerHTML = `<div style="overflow-x:auto"><table class="sim-table">
+      <tr><th>Ativo</th><th>Lado</th><th>Qtd</th><th>Entrada</th><th>Stop</th><th>Alvo 1</th><th>Alvo 2</th><th>P&L agora</th><th></th></tr>
+      ${sim.positions.map(p => {
+        const live = p.symbol === S.symbol && lastPrice != null;
+        const pnl = live ? (p.side === 'compra' ? lastPrice - p.entry : p.entry - lastPrice) * p.qty : null;
+        return `<tr>
+          <td>${p.symbol} <span style="color:var(--muted)">${p.tf}</span></td>
+          <td><span class="badge-side ${p.side === 'compra' ? 'buy' : 'sell'}">${p.side === 'compra' ? 'COMPRA' : 'VENDA'}</span></td>
+          <td>${fmtQty(p.qty)}</td>
+          <td>${formatPrice(p.entry)}</td>
+          <td class="down">${formatPrice(p.stop)}${p.halfTaken ? ' <span style="color:var(--muted)">(0x0)</span>' : ''}</td>
+          <td class="up">${p.halfTaken ? '✓ feito' : formatPrice(p.t1)}</td>
+          <td class="up">${formatPrice(p.t2)}</td>
+          <td class="${pnl == null ? '' : pnlCls(pnl)}">${pnl == null ? 'abra o ativo' : (pnl >= 0 ? '+' : '') + moneyFor(p.market, pnl)}</td>
+          <td><button class="btn mini ghost" data-close="${p.id}">Fechar</button></td>
+        </tr>`;
+      }).join('')}
+    </table></div>`;
+  }
+
+  // histórico
+  if (!closed.length) {
+    $('simHistory').innerHTML = '<div class="sim-empty">Nenhuma operação fechada ainda. Sua taxa de acerto aparecerá aqui.</div>';
+  } else {
+    $('simHistory').innerHTML = `<div style="overflow-x:auto;max-height:320px;overflow-y:auto"><table class="sim-table">
+      <tr><th>Data</th><th>Ativo</th><th>Lado</th><th>Qtd</th><th>Entrada</th><th>Saída</th><th>Motivo</th><th>Resultado</th><th>R</th></tr>
+      ${closed.slice(0, 60).map(h => `<tr>
+        <td>${new Date(h.closedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+        <td>${h.symbol}</td>
+        <td><span class="badge-side ${h.side === 'compra' ? 'buy' : 'sell'}">${h.side === 'compra' ? 'C' : 'V'}</span></td>
+        <td>${fmtQty(h.qty)}</td>
+        <td>${formatPrice(h.entry)}</td>
+        <td>${formatPrice(h.exit)}</td>
+        <td style="color:var(--muted)">${h.reason}</td>
+        <td class="${pnlCls(h.pnl)}">${h.pnl >= 0 ? '+' : ''}${moneyFor(h.market, h.pnl)}</td>
+        <td class="${pnlCls(h.r)}">${h.r >= 0 ? '+' : ''}${h.r.toFixed(2)}R</td>
+      </tr>`).join('')}
+    </table></div>`;
+  }
+}
+
+S.sim = loadSim();
+$('btnOpenSim').addEventListener('click', simOpen);
+$('btnResetSim').addEventListener('click', simReset);
+$('simPositions').addEventListener('click', e => {
+  const b = e.target.closest('[data-close]'); if (!b) return;
+  simManualClose(+b.dataset.close);
+});
+
 /* ============================== fluxo principal ============================== */
 async function analyze(silent) {
   const sym = $('symbolInput').value.trim().toUpperCase();
@@ -946,6 +1167,7 @@ async function analyze(silent) {
     renderIndicators(res);
     buildPlan(res, cs);
     drawChart(cs, res);
+    simUpdate(sym, last);
 
     const fmtL = v => formatPrice(v);
     $('srList').innerHTML =
@@ -963,7 +1185,7 @@ async function analyze(silent) {
 
 window.addEventListener('resize', () => { if (S.candles.length) analyze(true); });
 
-renderTf(); renderPicks();
+renderTf(); renderPicks(); renderSim();
 analyze();
 </script>
 </body>
