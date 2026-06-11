@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ETC · DayTrade Analyzer</title>
+<title>ETC · DayTrade — modo Claude 🤖</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- sem dependência externa de JS · dados: api.binance.com (cripto) e brapi.dev (ações B3) -->
 <style>
@@ -15,7 +15,7 @@
   --border2: #303845;
   --text: #e8e6e1;
   --muted: #7d8694;
-  --accent: #e85d2f;
+  --accent: #7c5cff;
   --green: #2ecc71;
   --green-dim: rgba(46,204,113,0.12);
   --red: #e74c3c;
@@ -194,6 +194,9 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 .badge-side { display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .06em; padding: 2px 8px; border-radius: 10px; }
 .badge-side.buy { color: var(--green); background: var(--green-dim); }
 .badge-side.sell { color: var(--red); background: var(--red-dim); }
+.diary-item { padding: 9px 18px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.55; color: #c9c5bd; }
+.diary-item:first-child { border-top: none; }
+.diary-time { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-right: 6px; }
 .empty-chart { padding: 80px 20px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
 .sr-list { padding: 4px 18px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted); line-height: 1.9; }
 .sr-list b.res { color: var(--red); } .sr-list b.sup { color: var(--green); }
@@ -202,14 +205,14 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 <body>
 
 <div class="topbar">
-  <div class="brand">ETC <em>·</em> DayTrade Analyzer <a href="daytrade-agressivo.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">🔥 modo agressivo</a> <a href="daytrade-claude.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">🤖 modo Claude</a></div>
+  <div class="brand">ETC <em>·</em> DayTrade 🤖 modo Claude <a href="daytrade.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">← modo aprendizado</a></div>
   <div class="topbar-status"><span class="status-dot" id="statusDot"></span><span id="statusTxt">aguardando</span></div>
 </div>
 
 <div class="wrap">
 
   <div class="disclaimer">
-    <strong>⚠ Aviso importante:</strong> esta ferramenta é <strong>educacional</strong> e gera análises automáticas baseadas em indicadores técnicos. Ela <strong>não é recomendação de investimento</strong>. Daytrade envolve risco alto: a maioria das pessoas que tenta perde dinheiro, principalmente no começo. Comece <strong>simulando no papel</strong> (sem dinheiro real) e nunca opere um valor cuja perda comprometeria sua vida. Leia o <a href="#guia" style="color:var(--yellow)">Guia do Iniciante</a> no fim da página.
+    <strong>🤖 MODO CLAUDE:</strong> aqui quem opera é o piloto automático com os critérios mais rigorosos da ferramenta — gráfico de 1h confirmado pelo 4h, força ≥ ±25, ADX ≥ 20, backtest positivo, risco fixo de 1%, máximo 2 posições sem correlação. Você só assiste: cada decisão (e cada recusa) fica registrada e explicada no <strong>Diário de decisões</strong>. Simulação educacional com dados reais — <strong>não é recomendação de investimento</strong>. Para o piloto operar, a página precisa estar aberta; ao reabrir, stops e alvos perdidos são processados retroativamente.
   </div>
 
   <div class="controls">
@@ -324,18 +327,25 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 
   <div class="card" style="margin-top:18px" id="simCard">
     <div class="card-head">
-      <span class="card-title">🎮 Conta de simulação (paper trading) — treine sem dinheiro real</span>
+      <span class="card-title">🤖 Carteira do Claude (simulação) — eu analiso, decido e executo; você assiste</span>
       <button class="btn mini danger" id="btnResetSim">Zerar conta</button>
     </div>
     <div class="sim-stats" id="simStats"></div>
     <div class="sim-actions">
-      <button class="btn" id="btnOpenSim">▶ Executar plano atual na simulação</button>
-      <span class="sim-hint" id="simHint">Quando houver sinal de COMPRA ou VENDA, clique para abrir a operação com o tamanho calculado pela regra de risco. Taxas de 0,1% por ponta são descontadas do resultado, como numa corretora real.</span>
+      <button class="btn" id="btnAutoScan">🤖 Analisar agora</button>
+      <span class="sim-hint" id="autoStatus">iniciando…</span>
+      <span class="sim-hint" id="simHint" style="display:none"></span>
     </div>
+    <div class="plan-note">Meus critérios para entrar: sinal no 1h com força ≥ ±25 · 4h confirmando a direção · ADX ≥ 20 · backtest positivo (≥5 trades) · risco de 1% · no máximo 2 posições, nunca na mesma direção em criptos correlacionadas · trava anti-revenge após stop · taxas de 0,1% por ponta descontadas.</div>
     <div class="card-head"><span class="card-title">Posições abertas</span></div>
     <div id="simPositions"><div class="sim-empty">Nenhuma posição aberta.</div></div>
     <div class="card-head"><span class="card-title">Histórico de operações</span></div>
     <div id="simHistory"><div class="sim-empty">Nenhuma operação fechada ainda. Sua taxa de acerto aparecerá aqui.</div></div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="card-head"><span class="card-title">🤖 Diário de decisões do Claude</span></div>
+    <div id="diaryBody" style="max-height:420px;overflow-y:auto"></div>
   </div>
 
   <details class="guide" id="guia">
@@ -408,7 +418,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 const S = {
   market: 'crypto',
   symbol: 'BTCUSDT',
-  tf: '15m',
+  tf: '1h',
   candles: [],          // {t,o,h,l,c,v}
   timer: null,
 };
@@ -1117,7 +1127,7 @@ function money(n) {
 }
 
 /* ============================== conta de simulação ============================== */
-const SIM_KEY = 'simAccount_v1';
+const SIM_KEY = 'simClaude_v1';
 const SIM_START = 10000;
 const SIM_FEE = 0.001;          // 0,1% por ponta, como numa corretora real
 const REVENGE_LOCK_MIN = 30;    // minutos sem novas entradas após um stop
@@ -1125,9 +1135,9 @@ const REVENGE_LOCK_MIN = 30;    // minutos sem novas entradas após um stop
 function loadSim() {
   try {
     const j = JSON.parse(localStorage.getItem(SIM_KEY));
-    if (j && typeof j.balance === 'number' && Array.isArray(j.positions) && Array.isArray(j.history)) return j;
+    if (j && typeof j.balance === 'number' && Array.isArray(j.positions) && Array.isArray(j.history)) { if (!Array.isArray(j.diary)) j.diary = []; return j; }
   } catch (e) {}
-  return { balance: SIM_START, positions: [], history: [] };
+  return { balance: SIM_START, positions: [], history: [], diary: [] };
 }
 function saveSim() { localStorage.setItem(SIM_KEY, JSON.stringify(S.sim)); }
 
@@ -1255,7 +1265,7 @@ function simManualClose(id) {
 
 function simReset() {
   if (!confirm('Zerar a conta de simulação? Posições e histórico serão apagados e o saldo volta para 10.000.')) return;
-  S.sim = { balance: SIM_START, positions: [], history: [] };
+  S.sim = { balance: SIM_START, positions: [], history: [], diary: [] };
   saveSim(); renderSim();
 }
 
@@ -1335,7 +1345,7 @@ function renderSim() {
 }
 
 S.sim = loadSim();
-$('btnOpenSim').addEventListener('click', simOpen);
+$('btnAutoScan').addEventListener('click', () => autoTick(true));
 $('btnResetSim').addEventListener('click', simReset);
 $('simPositions').addEventListener('click', e => {
   const b = e.target.closest('[data-close]'); if (!b) return;
@@ -1400,6 +1410,130 @@ $('radarBody').addEventListener('click', e => {
   }
   S.symbol = tr.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
 });
+
+/* ============================== modo Claude: piloto automático ============================== */
+const AUTO_TF = '1h';
+const AUTO_HTF = HTF_MAP[AUTO_TF];
+const AUTO_INTERVAL_MIN = 5;
+const AUTO_MAX_POS = 2;
+const AUTO_RISK = 1;
+const AUTO_MIN_SCORE = 25;
+const AUTO_MIN_ADX = 20;
+const AUTO_MIN_BT = 5;
+
+let autoBusy = false, nextScanAt = 0, lastScanMsg = 'iniciando…';
+
+function logDiary(kind, txt) {
+  if (!S.sim.diary) S.sim.diary = [];
+  S.sim.diary.unshift({ t: Date.now(), kind, txt });
+  S.sim.diary = S.sim.diary.slice(0, 100);
+  saveSim(); renderDiary();
+}
+
+function renderDiary() {
+  const d = S.sim.diary || [];
+  const icon = { open: '▶', win: '✅', loss: '❌', info: '💬' };
+  $('diaryBody').innerHTML = d.length
+    ? d.map(e => `<div class="diary-item"><span class="diary-time">${new Date(e.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> ${icon[e.kind] || '·'} ${e.txt}</div>`).join('')
+    : '<div class="sim-empty">Ainda não tomei nenhuma decisão. A primeira análise acontece segundos depois de a página abrir — e cada decisão (inclusive as recusas) aparecerá aqui, explicada.</div>';
+}
+
+function autoOpen(c, side) {
+  const last = c.cs[c.cs.length - 1].c;
+  const a = c.res.atr || last * 0.005;
+  const stop = side === 'compra' ? last - 1.5 * a : last + 1.5 * a;
+  const t1 = side === 'compra' ? last + 1.5 * (last - stop) : last - 1.5 * (stop - last);
+  const t2 = side === 'compra' ? last + 2.5 * (last - stop) : last - 2.5 * (stop - last);
+  const perUnit = Math.abs(last - stop);
+  if (perUnit <= 0) return false;
+  const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
+  const free = S.sim.balance - allocated;
+  if (free <= 0) return false;
+  let qty = (S.sim.balance * AUTO_RISK / 100) / perUnit;
+  if (qty * last > free) qty = free / last;
+  if (qty <= 0) return false;
+  S.sim.positions.push({
+    id: Date.now() + Math.floor(Math.random() * 1000), symbol: c.sym, market: 'crypto', tf: AUTO_TF,
+    side, qty, entry: last, stop, t1, t2, riskPerUnit: perUnit, halfTaken: false, openedAt: Date.now(),
+  });
+  saveSim(); renderSim();
+  logDiary('open', `Abri <b>${side.toUpperCase()} em ${c.sym}</b> a ${formatPrice(last)}. Por quê: força ${c.res.score > 0 ? '+' : ''}${c.res.score}, ${AUTO_TF} em ${c.res.trendTxt}, ${AUTO_HTF} em ${c.htfInfo.txt}, ADX ${c.res.adxV.toFixed(0)}, backtest ${(c.bt.avgR >= 0 ? '+' : '') + c.bt.avgR.toFixed(2)}R ×${c.bt.n}. Stop ${formatPrice(stop)} · alvos ${formatPrice(t1)} / ${formatPrice(t2)} · risco ${AUTO_RISK}%.`);
+  return true;
+}
+
+async function autoTick(manual) {
+  if (autoBusy) return;
+  autoBusy = true;
+  updateAutoStatus();
+  try {
+    // 1) gerencia as posições abertas (stop/alvos de cada ativo)
+    for (const sym of [...new Set(S.sim.positions.map(p => p.symbol))]) {
+      try {
+        const cs = await fetchCrypto(sym, AUTO_TF);
+        const before = S.sim.history.length;
+        simUpdate(sym, cs);
+        for (const h of S.sim.history.slice(0, S.sim.history.length - before)) {
+          logDiary(h.pnl >= 0 ? 'win' : 'loss', `Fechei ${h.side} em <b>${h.symbol}</b> (${h.reason}): ${h.pnl >= 0 ? '+' : ''}${moneyFor(h.market, h.pnl)} (${h.r >= 0 ? '+' : ''}${h.r.toFixed(2)}R).`);
+        }
+      } catch (e) {}
+    }
+    // 2) procura entradas novas dentro dos critérios
+    let opened = 0;
+    const skipped = [];
+    if (S.sim.lockUntil && Date.now() < S.sim.lockUntil) {
+      lastScanMsg = 'trava anti-revenge ativa — sem novas entradas por enquanto';
+    } else if (S.sim.positions.length >= AUTO_MAX_POS) {
+      lastScanMsg = `carteira cheia (${S.sim.positions.length}/${AUTO_MAX_POS}) — só gerenciando as posições`;
+    } else {
+      const settled = await Promise.allSettled(PICKS_CRYPTO.map(async sym => {
+        const [cs, csH] = await Promise.all([
+          fetchCrypto(sym, AUTO_TF),
+          fetchCrypto(sym, AUTO_HTF).catch(() => null),
+        ]);
+        if (cs.length < 60) throw new Error('poucos dados');
+        const res = analyzeSignals(cs);
+        const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+        if (htfInfo) applyHtfGate(res, htfInfo, AUTO_TF, AUTO_HTF);
+        return { sym, cs, res, htfInfo, bt: backtest(cs) };
+      }));
+      const rows = settled.filter(s => s.status === 'fulfilled').map(s => s.value);
+      const picks = rows.filter(r => {
+        if (r.res.cls === 'neutral') return false;
+        if (Math.abs(r.res.score) < AUTO_MIN_SCORE) { skipped.push(`${r.sym}: força ${r.res.score} abaixo de ±${AUTO_MIN_SCORE}`); return false; }
+        const aligned = r.htfInfo && ((r.res.cls === 'buy' && r.htfInfo.dir > 0) || (r.res.cls === 'sell' && r.htfInfo.dir < 0));
+        if (!aligned) { skipped.push(`${r.sym}: o ${AUTO_HTF} não confirma a direção`); return false; }
+        if (r.res.adxV == null || r.res.adxV < AUTO_MIN_ADX) { skipped.push(`${r.sym}: ADX ${r.res.adxV == null ? '—' : r.res.adxV.toFixed(0)} abaixo de ${AUTO_MIN_ADX}`); return false; }
+        if (!r.bt.n || r.bt.n < AUTO_MIN_BT || r.bt.avgR <= 0) { skipped.push(`${r.sym}: backtest fraco (${r.bt.n ? (r.bt.avgR >= 0 ? '+' : '') + r.bt.avgR.toFixed(2) + 'R ×' + r.bt.n : 'sem trades'})`); return false; }
+        return true;
+      }).sort((a, b) => Math.abs(b.res.score) - Math.abs(a.res.score));
+      for (const c of picks) {
+        if (S.sim.positions.length >= AUTO_MAX_POS) break;
+        const side = c.res.cls === 'buy' ? 'compra' : 'venda';
+        if (S.sim.positions.some(p => p.symbol === c.sym)) continue;
+        if (S.sim.positions.some(p => p.side === side && p.market === 'crypto')) { skipped.push(`${c.sym}: já tenho ${side} aberta em outra cripto (correlação)`); continue; }
+        if (autoOpen(c, side)) opened++;
+      }
+      lastScanMsg = opened
+        ? `abri ${opened} posição(ões) nesta análise`
+        : `${rows.length} criptos analisadas — nenhuma passou em todos os critérios`;
+      if (!opened && manual && skipped.length) {
+        logDiary('info', `Análise manual: nada passou nos meus critérios. Motivos: ${skipped.slice(0, 4).join(' · ')}${skipped.length > 4 ? ' · …' : ''}`);
+      }
+    }
+  } finally {
+    autoBusy = false;
+    nextScanAt = Date.now() + AUTO_INTERVAL_MIN * 60000;
+    updateAutoStatus();
+  }
+}
+
+function updateAutoStatus() {
+  const el = $('autoStatus');
+  if (!el) return;
+  if (autoBusy) { el.textContent = '🤖 analisando o mercado…'; return; }
+  const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+  el.textContent = `🤖 ${lastScanMsg} · próxima análise em ${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
+}
 
 /* ============================== fluxo principal ============================== */
 async function analyze(silent) {
@@ -1484,8 +1618,11 @@ async function analyze(silent) {
 
 window.addEventListener('resize', () => { if (S.candles.length) analyze(true); });
 
-renderTf(); renderPicks(); renderSim();
+renderTf(); renderPicks(); renderSim(); renderDiary();
 analyze();
+autoTick();
+setInterval(autoTick, AUTO_INTERVAL_MIN * 60000);
+setInterval(updateAutoStatus, 1000);
 </script>
 </body>
 </html>
