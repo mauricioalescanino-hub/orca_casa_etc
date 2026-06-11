@@ -212,7 +212,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 <div class="wrap">
 
   <div class="disclaimer">
-    <strong>🩸 CLAUDE SANGUE NOS OLHOS:</strong> o gêmeo do mal do <a href="daytrade-claude.html" style="color:var(--yellow)">Claude conservador</a>. Mesma inteligência, zero paciência: gráfico de 15m, análise a cada 2 min, força ≥ ±12, ignora o tempo maior e o backtest, até 6 posições simultâneas, risco de 3% cada, alavancagem 3×, sem trava anti-revenge. <strong>Expectativa honesta: esta conta deve quebrar</strong> — ela existe para comparar com a conta conservadora e provar, com dados, qual filosofia sobrevive. Simulação educacional; jamais leve estes parâmetros para dinheiro real.
+    <strong>🩸 CLAUDE SANGUE NOS OLHOS v2 — agressivo inteligente:</strong> o irmão impaciente do <a href="daytrade-claude.html" style="color:var(--yellow)">Claude conservador</a>. A agressividade ficou: 15m, análise a cada 2 min, força ≥ ±12, até 6 posições de 3% com alavancagem 3× e sem trava anti-revenge. A burrice saiu: só opera a favor da maré do 1h, recusa ativos com backtest negativo, no máximo 4 posições na mesma direção e stop com respiro de 1,5×ATR. Simulação educacional com dados reais — jamais leve alavancagem e 3% por trade para dinheiro real.
   </div>
 
   <div class="controls">
@@ -327,7 +327,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 
   <div class="card" style="margin-top:18px" id="simCard">
     <div class="card-head">
-      <span class="card-title">🩸 Carteira do Sangue nos Olhos (simulação) — muitos trades, zero medo, provavelmente zero saldo</span>
+      <span class="card-title">🩸 Carteira do Sangue nos Olhos v2 (simulação) — agressivo, mas não burro</span>
       <button class="btn mini danger" id="btnResetSim">Zerar conta</button>
     </div>
     <div class="sim-stats" id="simStats"></div>
@@ -336,7 +336,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
       <span class="sim-hint" id="autoStatus">iniciando…</span>
       <span class="sim-hint" id="simHint" style="display:none"></span>
     </div>
-    <div class="plan-note">Meus "critérios" para entrar: sinal no 15m com força ≥ ±12 · ADX ≥ 14 · e mais nada — ignoro o tempo maior, ignoro o backtest, aceito correlação, até 6 posições de 3% com alavancagem 3×. Taxas de 0,1% por ponta descontadas (a parte realista que nunca desligo).</div>
+    <div class="plan-note">Meus critérios v2: sinal no 15m com força ≥ ±12 · ADX ≥ 14 · 1h confirmando a direção · backtest não-negativo no ativo · até 6 posições de 3% (máx. 4 na mesma direção) com alavancagem 3× · stop 1,5×ATR · sem trava anti-revenge. Taxas de 0,1% por ponta descontadas.</div>
     <div class="card-head"><span class="card-title">Posições abertas</span></div>
     <div id="simPositions"><div class="sim-empty">Nenhuma posição aberta.</div></div>
     <div class="card-head"><span class="card-title">Histórico de operações</span></div>
@@ -1443,7 +1443,7 @@ function renderDiary() {
 function autoOpen(c, side) {
   const last = c.cs[c.cs.length - 1].c;
   const a = c.res.atr || last * 0.005;
-  const stop = side === 'compra' ? last - 1.0 * a : last + 1.0 * a;
+  const stop = side === 'compra' ? last - 1.5 * a : last + 1.5 * a;
   const t1 = side === 'compra' ? last + 1.5 * (last - stop) : last - 1.5 * (stop - last);
   const t2 = side === 'compra' ? last + 2.5 * (last - stop) : last - 2.5 * (stop - last);
   const perUnit = Math.abs(last - stop);
@@ -1505,16 +1505,17 @@ async function autoTick(manual) {
       const picks = rows.filter(r => {
         if (r.res.cls === 'neutral') return false;
         if (Math.abs(r.res.score) < AUTO_MIN_SCORE) { skipped.push(`${r.sym}: força ${r.res.score} abaixo de ±${AUTO_MIN_SCORE}`); return false; }
-        // sangue nos olhos: não exige confirmação do tempo maior
+        const aligned = r.htfInfo && ((r.res.cls === 'buy' && r.htfInfo.dir > 0) || (r.res.cls === 'sell' && r.htfInfo.dir < 0));
+        if (!aligned) { skipped.push(`${r.sym}: o ${AUTO_HTF} não confirma — agressivo sim, contra a maré não`); return false; }
         if (r.res.adxV == null || r.res.adxV < AUTO_MIN_ADX) { skipped.push(`${r.sym}: ADX ${r.res.adxV == null ? '—' : r.res.adxV.toFixed(0)} abaixo de ${AUTO_MIN_ADX}`); return false; }
-        // sangue nos olhos: opera mesmo com backtest fraco
+        if (r.bt.n >= 3 && r.bt.avgR <= 0) { skipped.push(`${r.sym}: backtest negativo (${(r.bt.avgR >= 0 ? '+' : '') + r.bt.avgR.toFixed(2)}R ×${r.bt.n}) neste ativo`); return false; }
         return true;
       }).sort((a, b) => Math.abs(b.res.score) - Math.abs(a.res.score));
       for (const c of picks) {
         if (S.sim.positions.length >= AUTO_MAX_POS) break;
         const side = c.res.cls === 'buy' ? 'compra' : 'venda';
         if (S.sim.positions.some(p => p.symbol === c.sym)) continue;
-        // sangue nos olhos: correlação? que correlação?
+        if (S.sim.positions.filter(p => p.side === side).length >= 4) { skipped.push(`${c.sym}: já tenho 4 posições de ${side} — exposição direcional no limite`); continue; }
         if (autoOpen(c, side)) opened++;
       }
       lastScanMsg = opened
