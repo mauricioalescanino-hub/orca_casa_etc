@@ -49,6 +49,16 @@ canvas { display: block; width: 100%; }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px 0; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
 .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
 .chart-note { padding: 8px 18px 14px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.sync-body { padding: 14px 18px 16px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.sync-body b { color: var(--text); }
+.sync-body a { color: var(--accent); }
+.sync-row { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.sync-row input { flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.sync-row button { background: var(--accent); color: #14171c; border: 0; border-radius: 8px; padding: 9px 16px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.sync-row button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border2); }
+.sync-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; min-height: 14px; }
+.spectator-banner { background: linear-gradient(90deg, #1a2030, #14171c); border: 1px solid var(--border2); border-radius: 10px; padding: 12px 16px; font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-bottom: 20px; display: none; }
+.spectator-banner b { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -59,13 +69,35 @@ canvas { display: block; width: 100%; }
 </div>
 
 <div class="wrap">
-  <div class="note">
+  <div class="note" id="topNote">
     Quatro carteiras simuladas, mesmo mercado, filosofias diferentes — este painel compara tudo ao vivo e desenha a evolução do patrimônio.
     Os dados vêm do armazenamento <b>deste navegador</b>: abra o placar no mesmo computador onde as páginas dos modos rodam.
     Modos: <a href="daytrade.html">🎓 aprendizado</a> · <a href="daytrade-agressivo.html">🔥 agressivo</a> · <a href="daytrade-claude.html">🤖 Claude</a> · <a href="daytrade-claude-agressivo.html">🩸 sangue nos olhos v2</a>
   </div>
 
+  <div class="spectator-banner" id="spectatorBanner">
+    📱 <b>Modo espectador</b> — você está vendo uma cópia transmitida pelo PC (somente leitura, nada é gravado neste aparelho).
+    <span id="spectatorMeta"></span>
+  </div>
+
   <div class="grid" id="cards"></div>
+
+  <div class="card" id="syncCard" style="margin-bottom:18px">
+    <div class="card-head"><span class="card-title">📡 Transmissão para o celular</span><span class="card-title" id="syncState">desligada</span></div>
+    <div class="sync-body" id="syncSetup">
+      Para acompanhar o placar de qualquer lugar, esta aba publica uma <b>cópia somente leitura</b> dos dados num Gist secreto do GitHub a cada 5 minutos.
+      Nada do histórico local é alterado — o PC continua sendo a fonte da verdade.<br>
+      1 · <a href="https://github.com/settings/tokens/new?scopes=gist&description=Placar%20ETC" target="_blank" rel="noopener">Crie um token do GitHub</a> marcando apenas o escopo <b>gist</b>.<br>
+      2 · Cole o token abaixo e ative:
+      <div class="sync-row"><input type="password" id="syncToken" placeholder="ghp_…" autocomplete="off"><button id="syncBtn">Ativar transmissão</button></div>
+      <div class="sync-msg" id="syncMsg"></div>
+    </div>
+    <div class="sync-body" id="syncActive" style="display:none">
+      Transmitindo a cada 5 minutos enquanto esta aba estiver aberta no PC. Abra (ou salve nos favoritos) este link no celular:
+      <div class="sync-row"><input type="text" id="syncLink" readonly><button id="syncCopy">Copiar link</button><button id="syncOff" class="ghost">Desligar</button></div>
+      <div class="sync-msg" id="syncLast"></div>
+    </div>
+  </div>
 
   <div class="card">
     <div class="card-head"><span class="card-title">Evolução do patrimônio</span><span class="card-title" id="chartMeta"></span></div>
@@ -89,12 +121,104 @@ const ACCOUNTS = [
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? '−' : '') + '$ ' + Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// ── sincronização PC → celular via Gist secreto (somente leitura no celular) ──
+const VIEW_GIST = new URLSearchParams(location.search).get('ver'); // modo espectador
+const SYNC_FILE = 'placar-etc.json';
+const SYNC_TOKEN_KEY = 'placarSyncToken', SYNC_GIST_KEY = 'placarSyncGist';
+const SYNC_INTERVAL = 5 * 60000;
+let remoteSnap = null, remoteFetchedAt = 0, lastBroadcast = 0;
+
 function loadAccount(a) {
+  if (VIEW_GIST) {
+    const d = (remoteSnap && remoteSnap.accounts && remoteSnap.accounts[a.key]) || {};
+    return { ...a, sim: d.sim || null, hist: d.hist || [] };
+  }
   let sim = null, hist = [];
   try { sim = JSON.parse(localStorage.getItem(a.key)); } catch (e) {}
   try { hist = JSON.parse(localStorage.getItem('eqhist_' + a.key) || '[]'); } catch (e) {}
   return { ...a, sim, hist };
 }
+
+async function fetchRemote() {
+  // limite anônimo da API do GitHub: busca no máx. a cada 5 min; cotações seguem ao vivo
+  if (remoteSnap && Date.now() - remoteFetchedAt < SYNC_INTERVAL) return;
+  const r = await fetch('https://api.github.com/gists/' + encodeURIComponent(VIEW_GIST),
+    { headers: { 'Accept': 'application/vnd.github+json' }, cache: 'no-store' });
+  if (!r.ok) throw new Error('GitHub respondeu ' + r.status);
+  const j = await r.json();
+  const f = j.files && (j.files[SYNC_FILE] || Object.values(j.files)[0]);
+  if (!f) throw new Error('snapshot não encontrado no Gist');
+  const txt = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+  remoteSnap = JSON.parse(txt);
+  remoteFetchedAt = Date.now();
+}
+
+async function broadcast(force) {
+  const token = localStorage.getItem(SYNC_TOKEN_KEY);
+  if (VIEW_GIST || !token) return;
+  if (!force && Date.now() - lastBroadcast < SYNC_INTERVAL) return;
+  const payload = { at: Date.now(), accounts: {} };
+  for (const a of ACCOUNTS) {
+    let sim = null, hist = [];
+    try { sim = JSON.parse(localStorage.getItem(a.key)); } catch (e) {}
+    try { hist = JSON.parse(localStorage.getItem('eqhist_' + a.key) || '[]'); } catch (e) {}
+    payload.accounts[a.key] = { sim, hist };
+  }
+  const files = { [SYNC_FILE]: { content: JSON.stringify(payload) } };
+  const send = id => fetch('https://api.github.com/gists' + (id ? '/' + id : ''), {
+    method: id ? 'PATCH' : 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
+    body: JSON.stringify(id ? { files } : { description: 'ETC · Placar do Experimento (transmissão)', public: false, files }),
+  });
+  let gistId = localStorage.getItem(SYNC_GIST_KEY);
+  let r = await send(gistId);
+  if (gistId && r.status === 404) { localStorage.removeItem(SYNC_GIST_KEY); gistId = null; r = await send(null); }
+  if (!r.ok) throw new Error('GitHub respondeu ' + r.status + (r.status === 401 ? ' — token inválido?' : ''));
+  if (!gistId) localStorage.setItem(SYNC_GIST_KEY, (await r.json()).id);
+  lastBroadcast = Date.now();
+}
+
+function syncPanel() {
+  if (VIEW_GIST) {
+    $('syncCard').style.display = 'none';
+    $('topNote').style.display = 'none';
+    $('spectatorBanner').style.display = 'block';
+    return;
+  }
+  const active = !!localStorage.getItem(SYNC_TOKEN_KEY) && !!localStorage.getItem(SYNC_GIST_KEY);
+  $('syncSetup').style.display = active ? 'none' : 'block';
+  $('syncActive').style.display = active ? 'block' : 'none';
+  $('syncState').textContent = active ? 'ativa' : 'desligada';
+  if (active) {
+    $('syncLink').value = location.origin + location.pathname + '?ver=' + localStorage.getItem(SYNC_GIST_KEY);
+    if (lastBroadcast) $('syncLast').textContent = 'último envio: ' + new Date(lastBroadcast).toLocaleTimeString('pt-BR');
+  }
+}
+
+$('syncBtn').addEventListener('click', async () => {
+  const token = $('syncToken').value.trim();
+  if (!token) { $('syncMsg').textContent = 'Cole o token primeiro.'; return; }
+  $('syncMsg').textContent = 'Testando token e publicando o primeiro snapshot…';
+  localStorage.setItem(SYNC_TOKEN_KEY, token);
+  try {
+    await broadcast(true);
+    $('syncMsg').textContent = '';
+    syncPanel();
+  } catch (e) {
+    localStorage.removeItem(SYNC_TOKEN_KEY);
+    $('syncMsg').textContent = '❌ ' + e.message;
+  }
+});
+
+$('syncCopy').addEventListener('click', () => {
+  navigator.clipboard.writeText($('syncLink').value).then(() => { $('syncLast').textContent = 'link copiado ✓'; });
+});
+
+$('syncOff').addEventListener('click', () => {
+  // desliga só a transmissão; o Gist e todo o histórico local permanecem intactos
+  localStorage.removeItem(SYNC_TOKEN_KEY);
+  syncPanel();
+});
 
 async function fetchPrices(symbols) {
   if (!symbols.length) return {};
@@ -239,20 +363,39 @@ function renderChart(rows) {
 
 async function refresh() {
   $('statusDot').className = 'status-dot loading'; $('statusTxt').textContent = 'atualizando…';
+  if (VIEW_GIST) {
+    try { await fetchRemote(); }
+    catch (e) {
+      if (!remoteSnap) {
+        $('statusDot').className = 'status-dot';
+        $('statusTxt').textContent = 'sem conexão com a transmissão';
+        $('spectatorMeta').textContent = '❌ Não consegui ler o snapshot (' + e.message + '). Confira se a aba do placar está aberta no PC com a transmissão ativa.';
+        return;
+      }
+    }
+  }
   const rows = ACCOUNTS.map(loadAccount);
   const symbols = [...new Set(rows.flatMap(r => (r.sim && r.sim.positions || [])
     .filter(p => p.market === 'crypto').map(p => p.symbol)))];
   const prices = await fetchPrices(symbols);
   for (const r of rows) {
     r.st = statsOf(r, prices);
-    if (r.st && r.st.known) { recordEquity(r.key, r.st.equity); r.hist = JSON.parse(localStorage.getItem('eqhist_' + r.key) || '[]'); }
+    if (!VIEW_GIST && r.st && r.st.known) { recordEquity(r.key, r.st.equity); r.hist = JSON.parse(localStorage.getItem('eqhist_' + r.key) || '[]'); }
   }
   renderCards(rows);
   renderChart(rows);
+  broadcast().then(syncPanel).catch(() => {});
   $('statusDot').className = 'status-dot online';
-  $('statusTxt').textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR');
+  if (VIEW_GIST && remoteSnap) {
+    const when = new Date(remoteSnap.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    $('statusTxt').textContent = 'espectador · snapshot ' + when;
+    $('spectatorMeta').textContent = 'Snapshot do PC de ' + new Date(remoteSnap.at).toLocaleString('pt-BR') + ' · cotações das posições abertas seguem ao vivo.';
+  } else {
+    $('statusTxt').textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR');
+  }
 }
 
+syncPanel();
 refresh();
 setInterval(refresh, 30000);
 window.addEventListener('resize', refresh);
