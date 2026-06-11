@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETC · 🏆 Placar do Experimento</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- sem dependência externa de JS · lê as 4 carteiras simuladas deste navegador -->
+<style>
+:root {
+  --bg: #0d0f12; --card: #14171c; --border: #242a33; --border2: #303845;
+  --text: #e8e6e1; --muted: #7d8694; --accent: #f0b429;
+  --green: #2ecc71; --red: #e74c3c; --yellow: #f0b429; --surface: #1d222a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+.topbar { background: #08090b; border-bottom: 1px solid var(--border); padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; }
+.brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.brand em { color: var(--accent); font-style: normal; }
+.topbar-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a4a4a; }
+.status-dot.online { background: var(--green); }
+.status-dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 22px 28px 80px; }
+.note { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-bottom: 20px; }
+.note a { color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; margin-bottom: 18px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.acc-head { padding: 14px 18px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.acc-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14.5px; }
+.acc-name a { color: inherit; text-decoration: none; }
+.acc-name a:hover { text-decoration: underline; }
+.acc-rank { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+.acc-eq { padding: 14px 18px 4px; }
+.acc-eq .v { font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; }
+.acc-eq .pct { font-family: 'IBM Plex Mono', monospace; font-size: 13px; margin-left: 8px; }
+.up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
+.acc-rows { padding: 8px 0 12px; }
+.row { display: flex; justify-content: space-between; padding: 4px 18px; font-size: 12.5px; }
+.row .k { color: var(--muted); }
+.row .v { font-family: 'IBM Plex Mono', monospace; }
+.acc-empty { padding: 22px 18px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.acc-empty a { color: var(--accent); }
+.card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+canvas { display: block; width: 100%; }
+.chart-wrap { padding: 12px 10px 16px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px 0; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.chart-note { padding: 8px 18px 14px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">ETC <em>·</em> 🏆 Placar do Experimento</div>
+  <div class="topbar-status"><span class="status-dot" id="statusDot"></span><span id="statusTxt">carregando…</span></div>
+</div>
+
+<div class="wrap">
+  <div class="note">
+    Quatro carteiras simuladas, mesmo mercado, filosofias diferentes — este painel compara tudo ao vivo e desenha a evolução do patrimônio.
+    Os dados vêm do armazenamento <b>deste navegador</b>: abra o placar no mesmo computador onde as páginas dos modos rodam.
+    Modos: <a href="daytrade.html">🎓 aprendizado</a> · <a href="daytrade-agressivo.html">🔥 agressivo</a> · <a href="daytrade-claude.html">🤖 Claude</a> · <a href="daytrade-claude-agressivo.html">🩸 sangue nos olhos v2</a>
+  </div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Evolução do patrimônio</span><span class="card-title" id="chartMeta"></span></div>
+    <div class="legend" id="legend"></div>
+    <div class="chart-wrap"><canvas id="chart" height="320"></canvas></div>
+    <div class="chart-note">Um ponto a cada 15 minutos, gravado enquanto a página de cada modo está aberta. A linha pontilhada marca os $ 10.000 iniciais. <b>Drawdown máx.</b> = a maior queda do patrimônio desde um topo — quanto menor, mais saudável o sistema.</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const START = 10000;
+const ACCOUNTS = [
+  { key: 'simAccount_v1',     name: '🎓 Aprendizado',        href: 'daytrade.html',                 color: '#4aa3e8' },
+  { key: 'simAggro_v1',       name: '🔥 Agressivo',          href: 'daytrade-agressivo.html',       color: '#e8742f' },
+  { key: 'simClaude_v1',      name: '🤖 Claude',             href: 'daytrade-claude.html',          color: '#7c5cff' },
+  { key: 'simClaudeAggro_v1', name: '🩸 Sangue nos Olhos v2', href: 'daytrade-claude-agressivo.html', color: '#ff2d55' },
+];
+
+const $ = id => document.getElementById(id);
+const money = n => (n < 0 ? '−' : '') + '$ ' + Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function loadAccount(a) {
+  let sim = null, hist = [];
+  try { sim = JSON.parse(localStorage.getItem(a.key)); } catch (e) {}
+  try { hist = JSON.parse(localStorage.getItem('eqhist_' + a.key) || '[]'); } catch (e) {}
+  return { ...a, sim, hist };
+}
+
+async function fetchPrices(symbols) {
+  if (!symbols.length) return {};
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=' + encodeURIComponent(JSON.stringify(symbols)));
+    if (!r.ok) return {};
+    const out = {};
+    for (const t of await r.json()) out[t.symbol] = +t.price;
+    return out;
+  } catch (e) { return {}; }
+}
+
+function statsOf(acc, prices) {
+  const sim = acc.sim;
+  if (!sim) return null;
+  let openPnl = 0, known = true;
+  for (const p of sim.positions || []) {
+    const lp = p.market === 'crypto' ? prices[p.symbol] : null;
+    if (lp != null) openPnl += (p.side === 'compra' ? lp - p.entry : p.entry - lp) * p.qty;
+    else known = false;
+  }
+  const equity = sim.balance + openPnl;
+  const closed = sim.history || [];
+  const wins = closed.filter(h => h.pnl > 0).length;
+  // drawdown máximo sobre o histórico + ponto atual
+  const series = acc.hist.map(h => h.e).concat(known ? [equity] : []);
+  let peak = START, dd = 0;
+  for (const e of series) { peak = Math.max(peak, e); dd = Math.max(dd, (peak - e) / peak); }
+  return {
+    equity, known, openPnl,
+    balance: sim.balance,
+    positions: (sim.positions || []).length,
+    trades: closed.length,
+    winRate: closed.length ? wins / closed.length * 100 : null,
+    avgR: closed.length ? closed.reduce((s, h) => s + (h.r || 0), 0) / closed.length : null,
+    dd: dd * 100,
+  };
+}
+
+function recordEquity(key, equity) {
+  try {
+    const k = 'eqhist_' + key;
+    const h = JSON.parse(localStorage.getItem(k) || '[]');
+    const last = h[h.length - 1];
+    if (last && Date.now() - last.t < 15 * 60000) return;
+    h.push({ t: Date.now(), e: Math.round(equity * 100) / 100 });
+    if (h.length > 3000) h.splice(0, h.length - 3000);
+    localStorage.setItem(k, JSON.stringify(h));
+  } catch (e) {}
+}
+
+function renderCards(rows) {
+  const ranked = rows.filter(r => r.st).sort((a, b) => b.st.equity - a.st.equity);
+  const medal = ['🥇', '🥈', '🥉', '4º'];
+  $('cards').innerHTML = rows.map(r => {
+    if (!r.st) {
+      return `<div class="card">
+        <div class="acc-head"><span class="acc-name" style="color:${r.color}"><a href="${r.href}">${r.name}</a></span></div>
+        <div class="acc-empty">Sem dados neste navegador ainda. <a href="${r.href}">Abra a página do modo</a> ao menos uma vez aqui para entrar no placar.</div>
+      </div>`;
+    }
+    const st = r.st;
+    const pos = ranked.indexOf(r);
+    const pct = (st.equity - START) / START * 100;
+    const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+    return `<div class="card" style="border-top:3px solid ${r.color}">
+      <div class="acc-head">
+        <span class="acc-name" style="color:${r.color}"><a href="${r.href}">${r.name}</a></span>
+        <span class="acc-rank">${medal[pos] || ''}</span>
+      </div>
+      <div class="acc-eq"><span class="v ${cls(pct)}">${money(st.equity)}</span><span class="pct ${cls(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span></div>
+      <div class="acc-rows">
+        <div class="row"><span class="k">Saldo realizado</span><span class="v">${money(st.balance)}</span></div>
+        <div class="row"><span class="k">P&L aberto${st.known ? '' : ' (parcial)'}</span><span class="v ${cls(st.openPnl)}">${st.positions ? (st.openPnl >= 0 ? '+' : '') + money(st.openPnl) : '—'}</span></div>
+        <div class="row"><span class="k">Posições abertas</span><span class="v">${st.positions}</span></div>
+        <div class="row"><span class="k">Trades fechados</span><span class="v">${st.trades}</span></div>
+        <div class="row"><span class="k">Taxa de acerto</span><span class="v ${st.winRate == null ? '' : st.winRate >= 50 ? 'up' : 'down'}">${st.winRate == null ? '—' : st.winRate.toFixed(0) + '%'}</span></div>
+        <div class="row"><span class="k">R médio</span><span class="v ${st.avgR == null ? '' : cls(st.avgR)}">${st.avgR == null ? '—' : (st.avgR >= 0 ? '+' : '') + st.avgR.toFixed(2) + 'R'}</span></div>
+        <div class="row"><span class="k">Drawdown máx.</span><span class="v ${st.dd > 0.05 ? 'down' : ''}">−${st.dd.toFixed(2)}%</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderChart(rows) {
+  const cv = $('chart'), ctx = cv.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = 320;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const withHist = rows.filter(r => r.hist.length >= 2);
+  $('legend').innerHTML = rows.map(r =>
+    `<span><i style="background:${r.color}"></i>${r.name}${r.hist.length < 2 ? ' (coletando…)' : ''}</span>`).join('');
+
+  if (!withHist.length) {
+    ctx.fillStyle = '#7d8694'; ctx.font = '13px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Coletando histórico — os primeiros pontos aparecem após ~30 min com as páginas dos modos abertas.', W / 2, H / 2);
+    return;
+  }
+
+  let t0 = Infinity, t1 = -Infinity, lo = START, hi = START;
+  for (const r of withHist) for (const h of r.hist) {
+    t0 = Math.min(t0, h.t); t1 = Math.max(t1, h.t);
+    lo = Math.min(lo, h.e); hi = Math.max(hi, h.e);
+  }
+  const pad = Math.max((hi - lo) * 0.08, 20); lo -= pad; hi += pad;
+  const padL = 8, padR = 70, padT = 10, padB = 24;
+  const x = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR);
+  const y = e => padT + (hi - e) / (hi - lo) * (H - padT - padB);
+
+  // grade + eixo
+  ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+  const steps = 5;
+  for (let s = 0; s <= steps; s++) {
+    const v = lo + (hi - lo) * s / steps;
+    ctx.strokeStyle = '#1c212a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
+    ctx.fillStyle = '#7d8694';
+    ctx.fillText(v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }), W - padR + 6, y(v) + 3);
+  }
+  // linha dos 10.000
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = '#566273';
+  ctx.beginPath(); ctx.moveTo(padL, y(START)); ctx.lineTo(W - padR, y(START)); ctx.stroke();
+  ctx.setLineDash([]);
+  // eixo do tempo (início e fim)
+  ctx.fillStyle = '#566273'; ctx.textAlign = 'left';
+  ctx.fillText(new Date(t0).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), padL, H - 8);
+  ctx.textAlign = 'right';
+  ctx.fillText(new Date(t1).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), W - padR, H - 8);
+
+  for (const r of withHist) {
+    ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.beginPath();
+    r.hist.forEach((h, i) => i ? ctx.lineTo(x(h.t), y(h.e)) : ctx.moveTo(x(h.t), y(h.e)));
+    ctx.stroke();
+    const last = r.hist[r.hist.length - 1];
+    ctx.fillStyle = r.color;
+    ctx.beginPath(); ctx.arc(x(last.t), y(last.e), 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  $('chartMeta').textContent = `${withHist.reduce((s, r) => s + r.hist.length, 0)} pontos`;
+}
+
+async function refresh() {
+  $('statusDot').className = 'status-dot loading'; $('statusTxt').textContent = 'atualizando…';
+  const rows = ACCOUNTS.map(loadAccount);
+  const symbols = [...new Set(rows.flatMap(r => (r.sim && r.sim.positions || [])
+    .filter(p => p.market === 'crypto').map(p => p.symbol)))];
+  const prices = await fetchPrices(symbols);
+  for (const r of rows) {
+    r.st = statsOf(r, prices);
+    if (r.st && r.st.known) { recordEquity(r.key, r.st.equity); r.hist = JSON.parse(localStorage.getItem('eqhist_' + r.key) || '[]'); }
+  }
+  renderCards(rows);
+  renderChart(rows);
+  $('statusDot').className = 'status-dot online';
+  $('statusTxt').textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR');
+}
+
+refresh();
+setInterval(refresh, 30000);
+window.addEventListener('resize', refresh);
+</script>
+</body>
+</html>

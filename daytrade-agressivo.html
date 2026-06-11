@@ -202,7 +202,7 @@ details.guide[open] summary::before { transform: rotate(90deg); }
 <body>
 
 <div class="topbar">
-  <div class="brand">ETC <em>·</em> DayTrade 🔥AGRESSIVO <a href="daytrade.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">← modo aprendizado</a></div>
+  <div class="brand">ETC <em>·</em> DayTrade 🔥AGRESSIVO <a href="daytrade.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">← modo aprendizado</a> <a href="placar.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">🏆 placar</a></div>
   <div class="topbar-status"><span class="status-dot" id="statusDot"></span><span id="statusTxt">aguardando</span></div>
 </div>
 
@@ -1259,6 +1259,7 @@ function renderSim() {
   }
   const equity = sim.balance + openPnl;
   const avgPnl = sim.positions.length ? openPnl / sim.positions.length : null;
+  if (openPnlKnown) recordEquity(equity);
 
   const closed = sim.history;
   const wins = closed.filter(h => h.pnl > 0).length;
@@ -1391,6 +1392,19 @@ $('radarBody').addEventListener('click', e => {
   }
   S.symbol = tr.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
 });
+
+/* ============================== histórico do patrimônio ============================== */
+function recordEquity(equity) {
+  try {
+    const k = 'eqhist_' + SIM_KEY;
+    const h = JSON.parse(localStorage.getItem(k) || '[]');
+    const last = h[h.length - 1];
+    if (last && Date.now() - last.t < 15 * 60000) return;
+    h.push({ t: Date.now(), e: Math.round(equity * 100) / 100 });
+    if (h.length > 3000) h.splice(0, h.length - 3000);
+    localStorage.setItem(k, JSON.stringify(h));
+  } catch (e) {}
+}
 
 /* ============================== cotações ao vivo ============================== */
 // busca o preço atual de todos os ativos com posição aberta (endpoint leve
