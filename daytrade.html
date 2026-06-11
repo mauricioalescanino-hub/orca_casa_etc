@@ -1263,13 +1263,17 @@ function renderSim() {
   const sim = S.sim;
   const lastPrice = S.candles.length ? S.candles[S.candles.length - 1].c : null;
 
-  // P&L aberto (só calculável para o ativo em tela)
+  // P&L aberto em tempo real: preço em tela para o ativo atual e cotação
+  // ao vivo (ticker, a cada 15s) para todos os demais
+  const priceOf = p => (p.symbol === S.symbol && lastPrice != null) ? lastPrice : ((S.live && S.live[p.symbol]) || null);
   let openPnl = 0, openPnlKnown = true;
   for (const p of sim.positions) {
-    if (p.symbol === S.symbol && lastPrice != null) {
-      openPnl += (p.side === 'compra' ? lastPrice - p.entry : p.entry - lastPrice) * p.qty;
-    } else openPnlKnown = false;
+    const lp = priceOf(p);
+    if (lp != null) openPnl += (p.side === 'compra' ? lp - p.entry : p.entry - lp) * p.qty;
+    else openPnlKnown = false;
   }
+  const equity = sim.balance + openPnl;
+  const avgPnl = sim.positions.length ? openPnl / sim.positions.length : null;
 
   const closed = sim.history;
   const wins = closed.filter(h => h.pnl > 0).length;
@@ -1283,10 +1287,12 @@ function renderSim() {
     <div class="sim-stat"><div class="k">Saldo (realizado)</div><div class="v ${pnlCls(sim.balance - SIM_START)}">${moneyFor(cur, sim.balance)}</div></div>
     <div class="sim-stat"><div class="k">Resultado total</div><div class="v ${pnlCls(totalPnl)}">${totalPnl >= 0 ? '+' : ''}${moneyFor(cur, totalPnl)} (${(totalPnl / SIM_START * 100).toFixed(2)}%)</div></div>
     <div class="sim-stat"><div class="k">P&L aberto${openPnlKnown ? '' : ' *'}</div><div class="v ${pnlCls(openPnl)}">${sim.positions.length ? (openPnl >= 0 ? '+' : '') + moneyFor(cur, openPnl) : '—'}</div></div>
+    <div class="sim-stat"><div class="k">P&L médio/posição</div><div class="v ${pnlCls(avgPnl || 0)}">${avgPnl != null ? (avgPnl >= 0 ? '+' : '') + moneyFor(cur, avgPnl) : '—'}</div></div>
+    <div class="sim-stat"><div class="k">Patrimônio agora</div><div class="v ${pnlCls(equity - SIM_START)}">${moneyFor(cur, equity)}</div></div>
     <div class="sim-stat"><div class="k">Operações fechadas</div><div class="v">${closed.length}</div></div>
     <div class="sim-stat"><div class="k">Taxa de acerto</div><div class="v ${winRate == null ? '' : winRate >= 50 ? 'up' : 'down'}">${winRate == null ? '—' : winRate.toFixed(0) + '%'}</div></div>
     <div class="sim-stat"><div class="k">R médio por trade</div><div class="v ${avgR == null ? '' : pnlCls(avgR)}">${avgR == null ? '—' : (avgR >= 0 ? '+' : '') + avgR.toFixed(2) + 'R'}</div></div>
-  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Há posições em outros ativos — analise cada um para atualizar o preço e o monitoramento de stop/alvos.</div></div>')
+  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Aguardando a cotação ao vivo de algum ativo (atualiza a cada 15s). Lembre: a execução de stop/alvos continua acontecendo pela análise de candles de cada ativo.</div></div>')
   + (sim.lockUntil && Date.now() < sim.lockUntil ? `<div class="sim-stat" style="grid-column:1/-1"><div class="k">🛡 Trava anti-revenge ativa</div><div style="font-size:11px;color:var(--yellow);line-height:1.5">Stop recente: novas entradas liberadas em ${Math.ceil((sim.lockUntil - Date.now()) / 60000)} min. Pausa faz parte do método.</div></div>` : '');
 
   // posições abertas
@@ -1296,8 +1302,8 @@ function renderSim() {
     $('simPositions').innerHTML = `<div style="overflow-x:auto"><table class="sim-table">
       <tr><th>Ativo</th><th>Lado</th><th>Qtd</th><th>Entrada</th><th>Stop</th><th>Alvo 1</th><th>Alvo 2</th><th>P&L agora</th><th></th></tr>
       ${sim.positions.map(p => {
-        const live = p.symbol === S.symbol && lastPrice != null;
-        const pnl = live ? (p.side === 'compra' ? lastPrice - p.entry : p.entry - lastPrice) * p.qty : null;
+        const lp = priceOf(p);
+        const pnl = lp != null ? (p.side === 'compra' ? lp - p.entry : p.entry - lp) * p.qty : null;
         return `<tr>
           <td>${p.symbol} <span style="color:var(--muted)">${p.tf}</span></td>
           <td><span class="badge-side ${p.side === 'compra' ? 'buy' : 'sell'}">${p.side === 'compra' ? 'COMPRA' : 'VENDA'}</span></td>
@@ -1306,7 +1312,7 @@ function renderSim() {
           <td class="down">${formatPrice(p.stop)}${p.halfTaken ? ' <span style="color:var(--muted)">(0x0)</span>' : ''}</td>
           <td class="up">${p.halfTaken ? '✓ feito' : formatPrice(p.t1)}</td>
           <td class="up">${formatPrice(p.t2)}</td>
-          <td class="${pnl == null ? '' : pnlCls(pnl)}">${pnl == null ? 'abra o ativo' : (pnl >= 0 ? '+' : '') + moneyFor(p.market, pnl)}</td>
+          <td class="${pnl == null ? '' : pnlCls(pnl)}">${pnl == null ? 'aguardando cotação…' : (pnl >= 0 ? '+' : '') + moneyFor(p.market, pnl)}</td>
           <td><button class="btn mini ghost" data-close="${p.id}">Fechar</button></td>
         </tr>`;
       }).join('')}
@@ -1401,6 +1407,24 @@ $('radarBody').addEventListener('click', e => {
   S.symbol = tr.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
 });
 
+/* ============================== cotações ao vivo ============================== */
+// busca o preço atual de todos os ativos com posição aberta (endpoint leve
+// da Binance) para o P&L em tempo real; a execução de stop/alvos continua
+// sendo feita pelos candles (simUpdate)
+async function refreshLivePrices() {
+  const syms = [...new Set(S.sim.positions.filter(p => p.market === 'crypto').map(p => p.symbol))];
+  if (!syms.length) return;
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=' + encodeURIComponent(JSON.stringify(syms)));
+    if (!r.ok) return;
+    const j = await r.json();
+    S.live = S.live || {};
+    for (const t of j) S.live[t.symbol] = +t.price;
+    renderSim();
+  } catch (e) {}
+}
+setInterval(refreshLivePrices, 15000);
+
 /* ============================== fluxo principal ============================== */
 async function analyze(silent) {
   const sym = $('symbolInput').value.trim().toUpperCase();
@@ -1484,7 +1508,7 @@ async function analyze(silent) {
 
 window.addEventListener('resize', () => { if (S.candles.length) analyze(true); });
 
-renderTf(); renderPicks(); renderSim();
+renderTf(); renderPicks(); renderSim(); refreshLivePrices();
 analyze();
 </script>
 </body>
