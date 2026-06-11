@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETC · DayTrade — Claude Desafiante v3 🥊</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- sem dependência externa de JS · dados: api.binance.com (cripto) e brapi.dev (ações B3) -->
+<style>
+:root {
+  --bg: #0d0f12;
+  --card: #14171c;
+  --card2: #191d23;
+  --border: #242a33;
+  --border2: #303845;
+  --text: #e8e6e1;
+  --muted: #7d8694;
+  --accent: #00c2a8;
+  --green: #2ecc71;
+  --green-dim: rgba(46,204,113,0.12);
+  --red: #e74c3c;
+  --red-dim: rgba(231,76,60,0.12);
+  --yellow: #f0b429;
+  --yellow-dim: rgba(240,180,41,0.12);
+  --blue: #4aa3e8;
+  --surface: #1d222a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+
+.topbar {
+  background: #08090b; border-bottom: 1px solid var(--border);
+  padding: 0 28px; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 200;
+}
+.brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.brand em { color: var(--accent); font-style: normal; }
+.topbar-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a4a4a; }
+.status-dot.online { background: var(--green); }
+.status-dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+.status-dot.error { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 22px 28px 80px; }
+
+.disclaimer {
+  background: var(--yellow-dim); border: 1px solid rgba(240,180,41,0.35); border-radius: 10px;
+  padding: 12px 16px; font-size: 12.5px; line-height: 1.55; color: #e8d5a0; margin-bottom: 20px;
+}
+.disclaimer strong { color: var(--yellow); }
+
+/* ---------- controles ---------- */
+.controls {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+}
+.ctl { display: flex; flex-direction: column; gap: 6px; }
+.ctl label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  padding: 8px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; transition: all .15s;
+}
+.seg button:hover { color: var(--text); }
+.seg button.active { background: var(--accent); color: #fff; }
+input[type=text], input[type=number], input[type=password] {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  outline: none; transition: border-color .2s; width: 150px;
+}
+input:focus { border-color: var(--accent); }
+.btn {
+  background: var(--accent); border: none; border-radius: 8px; color: #fff; cursor: pointer;
+  padding: 9px 20px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.12); }
+.btn.ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+.btn.ghost:hover { color: var(--text); border-color: var(--muted); }
+.quickpicks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+  cursor: pointer; transition: all .15s;
+}
+.chip:hover { color: var(--text); border-color: var(--border2); }
+.chip.active { color: var(--accent); border-color: var(--accent); }
+.toggle-row { display: flex; align-items: center; gap: 8px; padding-bottom: 9px; }
+.toggle-row input { width: auto; }
+.toggle-row span { font-size: 12.5px; color: var(--muted); }
+.token-hint { font-size: 11px; color: var(--muted); margin-top: 3px; max-width: 230px; line-height: 1.45; }
+.token-hint a { color: var(--blue); }
+
+/* ---------- grid ---------- */
+.grid { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
+@media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card-title { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.card-body { padding: 18px; }
+
+/* ---------- preço atual ---------- */
+.price-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
+.price-big { font-family: 'IBM Plex Mono', monospace; font-size: 32px; font-weight: 600; }
+.price-chg { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
+.up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
+.price-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+
+canvas { display: block; width: 100%; }
+.chart-wrap { padding: 6px 8px 14px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 18px 0; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
+/* ---------- sinal ---------- */
+.signal-box { text-align: center; padding: 22px 18px 16px; }
+.signal-label {
+  display: inline-block; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px;
+  letter-spacing: -0.02em; padding: 10px 28px; border-radius: 12px;
+}
+.signal-label.buy { color: var(--green); background: var(--green-dim); border: 1px solid rgba(46,204,113,0.4); }
+.signal-label.sell { color: var(--red); background: var(--red-dim); border: 1px solid rgba(231,76,60,0.4); }
+.signal-label.neutral { color: var(--yellow); background: var(--yellow-dim); border: 1px solid rgba(240,180,41,0.4); }
+.signal-sub { margin-top: 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.gauge-wrap { padding: 6px 26px 18px; }
+.gauge-track { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--red), var(--yellow) 50%, var(--green)); position: relative; }
+.gauge-pin { position: absolute; top: -5px; width: 4px; height: 20px; background: #fff; border-radius: 2px; transform: translateX(-50%); transition: left .5s ease; box-shadow: 0 0 6px rgba(0,0,0,.6); }
+.gauge-scale { display: flex; justify-content: space-between; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); }
+.trend-line { display: flex; justify-content: space-between; padding: 12px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+.trend-line b { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+
+/* ---------- plano ---------- */
+.plan-rows { display: flex; flex-direction: column; }
+.plan-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+.plan-row .k { color: var(--muted); }
+.plan-row .v { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13.5px; }
+.plan-note { padding: 12px 18px; font-size: 12px; color: var(--muted); line-height: 1.55; border-top: 1px solid var(--border); }
+.calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
+.calc-grid .ctl { width: 100%; }
+.calc-grid input { width: 100%; }
+.calc-result { grid-column: 1 / -1; background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; line-height: 1.6; }
+.calc-result b { color: var(--green); font-family: 'IBM Plex Mono', monospace; }
+
+/* ---------- indicadores ---------- */
+.ind-table { width: 100%; border-collapse: collapse; }
+.ind-table td { padding: 10px 18px; border-top: 1px solid var(--border); font-size: 12.5px; vertical-align: top; }
+.ind-table tr:first-child td { border-top: none; }
+.ind-name { font-weight: 600; white-space: nowrap; }
+.ind-val { font-family: 'IBM Plex Mono', monospace; color: var(--muted); white-space: nowrap; }
+.vote { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .08em; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+.vote.buy { color: var(--green); background: var(--green-dim); }
+.vote.sell { color: var(--red); background: var(--red-dim); }
+.vote.neutral { color: var(--yellow); background: var(--yellow-dim); }
+.ind-expl { color: var(--muted); line-height: 1.5; font-size: 12px; padding-top: 4px; }
+
+/* ---------- guia ---------- */
+details.guide { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-top: 18px; }
+details.guide summary {
+  cursor: pointer; padding: 16px 18px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+  list-style: none; display: flex; align-items: center; gap: 10px;
+}
+details.guide summary::-webkit-details-marker { display: none; }
+details.guide summary::before { content: '▸'; color: var(--accent); transition: transform .2s; }
+details.guide[open] summary::before { transform: rotate(90deg); }
+.guide-body { padding: 0 22px 22px; font-size: 13.5px; line-height: 1.7; color: #c9c5bd; }
+.guide-body h3 { font-family: 'Syne', sans-serif; font-size: 14px; color: var(--text); margin: 18px 0 6px; }
+.guide-body ul, .guide-body ol { padding-left: 22px; margin: 6px 0; }
+.guide-body li { margin: 4px 0; }
+.guide-body .hl { color: var(--green); font-weight: 600; }
+.guide-body .hl2 { color: var(--red); font-weight: 600; }
+.guide-body code { background: var(--surface); padding: 1px 6px; border-radius: 4px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+
+.errbox { background: var(--red-dim); border: 1px solid rgba(231,76,60,0.4); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #f0a8a0; margin-bottom: 16px; display: none; line-height: 1.55; }
+
+/* ---------- simulação ---------- */
+.sim-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.sim-stat { background: var(--card); padding: 14px 18px; }
+.sim-stat .k { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.sim-stat .v { font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 600; }
+.sim-actions { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sim-hint { font-size: 12px; color: var(--muted); }
+.sim-table { width: 100%; border-collapse: collapse; }
+.sim-table th { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 500; }
+.sim-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12px; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.sim-table tr:last-child td { border-bottom: none; }
+.sim-empty { padding: 16px 18px; font-size: 12.5px; color: var(--muted); }
+.btn.mini { padding: 5px 12px; font-size: 11px; }
+.btn.danger { background: transparent; border: 1px solid rgba(231,76,60,0.5); color: var(--red); }
+.btn.danger:hover { background: var(--red-dim); }
+.badge-side { display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .06em; padding: 2px 8px; border-radius: 10px; }
+.badge-side.buy { color: var(--green); background: var(--green-dim); }
+.badge-side.sell { color: var(--red); background: var(--red-dim); }
+.diary-item { padding: 9px 18px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.55; color: #c9c5bd; }
+.diary-item:first-child { border-top: none; }
+.diary-time { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-right: 6px; }
+.empty-chart { padding: 80px 20px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.sr-list { padding: 4px 18px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+.sr-list b.res { color: var(--red); } .sr-list b.sup { color: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">ETC <em>·</em> 🥊 Claude DESAFIANTE v3 <a href="daytrade-claude-agressivo.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">← Sangue nos Olhos v2</a> <a href="placar.html" style="color:#7d8694;font-size:10px;text-decoration:none;font-weight:400;font-family:'IBM Plex Mono',monospace;margin-left:8px">🏆 placar</a></div>
+  <div class="topbar-status"><span class="status-dot" id="statusDot"></span><span id="statusTxt">aguardando</span></div>
+</div>
+
+<div class="wrap">
+
+  <div class="disclaimer">
+    <strong>🥊 CLAUDE DESAFIANTE v3 — o v2 corrigido pelos dados:</strong> mesmo DNA agressivo do <a href="daytrade-claude-agressivo.html" style="color:var(--yellow)">Sangue nos Olhos v2</a> (15m, análise a cada 2 min, força ≥ ±12, até 6 posições de 3% com alavancagem 3×), mais duas correções que o primeiro dia de experimento pediu: <b>(1)</b> o tamanho da posição embute taxa + slippage, para um stop custar de fato ~1R (no v2 custava −1,29R); <b>(2)</b> só entra com tendência PLENA no 1h e com o 4h (a maré do dia) a favor — foi operando contra o dia que o v2 perdeu $227 em 5 shorts. Simulação educacional com dados reais — jamais leve alavancagem e 3% por trade para dinheiro real.
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label>Mercado</label>
+      <div class="seg" id="segMarket">
+        <button data-m="crypto" class="active">Cripto</button>
+        <button data-m="b3">Ações B3</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label>Ativo</label>
+      <input type="text" id="symbolInput" value="BTCUSDT" spellcheck="false">
+      <div class="quickpicks" id="quickPicks"></div>
+    </div>
+    <div class="ctl">
+      <label>Tempo gráfico</label>
+      <div class="seg" id="segTf"></div>
+    </div>
+    <div class="ctl" id="tokenCtl" style="display:none">
+      <label>Token brapi.dev</label>
+      <input type="password" id="brapiToken" placeholder="cole seu token">
+      <div class="token-hint">Grátis: crie conta em <a href="https://brapi.dev" target="_blank">brapi.dev</a> e copie o token. Fica salvo só no seu navegador.</div>
+    </div>
+    <button class="btn" id="btnAnalyze">Analisar</button>
+    <div class="toggle-row">
+      <input type="checkbox" id="autoRefresh" checked>
+      <span>Atualizar a cada 30s</span>
+    </div>
+  </div>
+
+  <div class="errbox" id="errBox"></div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <span class="card-title">📡 Radar de oportunidades · 10 criptos</span>
+      <button class="btn mini" id="btnScan">Escanear agora</button>
+    </div>
+    <div id="radarBody"><div class="sim-empty">Toque em "Escanear agora" para varrer as 10 principais criptos no tempo gráfico atual e ver onde há sinal neste momento.</div></div>
+  </div>
+
+  <div class="grid">
+    <!-- coluna esquerda: gráfico -->
+    <div>
+      <div class="card">
+        <div class="price-row">
+          <div class="price-big" id="priceBig">—</div>
+          <div class="price-chg" id="priceChg"></div>
+          <div class="price-meta" id="priceMeta"></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#4aa3e8"></i>EMA 9</span>
+          <span><i style="background:#f0b429"></i>EMA 21</span>
+          <span><i style="background:#b07cc6"></i>EMA 50</span>
+          <span><i style="background:#566273"></i>Bollinger (20,2)</span>
+          <span><i style="background:#2ecc71"></i>Suporte</span>
+          <span><i style="background:#e74c3c"></i>Resistência</span>
+        </div>
+        <div class="chart-wrap">
+          <div class="empty-chart" id="emptyChart">Escolha um ativo e clique em <b>Analisar</b>.<br>Ex.: BTCUSDT (cripto) ou PETR4 (B3 — precisa do token grátis da brapi.dev).</div>
+          <canvas id="chart" height="380" style="display:none"></canvas>
+          <canvas id="rsiChart" height="90" style="display:none"></canvas>
+        </div>
+        <div class="sr-list" id="srList"></div>
+      </div>
+    </div>
+
+    <!-- coluna direita: sinal + plano + indicadores -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Sinal agora</span><span class="card-title" id="signalTime"></span></div>
+        <div class="signal-box">
+          <div class="signal-label neutral" id="signalLabel">AGUARDE</div>
+          <div class="signal-sub" id="signalSub">Faça uma análise para ver o sinal.</div>
+        </div>
+        <div class="gauge-wrap">
+          <div class="gauge-track"><div class="gauge-pin" id="gaugePin" style="left:50%"></div></div>
+          <div class="gauge-scale"><span>VENDA FORTE</span><span>NEUTRO</span><span>COMPRA FORTE</span></div>
+        </div>
+        <div class="trend-line"><span style="color:var(--muted)">Tendência</span><b id="trendTxt">—</b></div>
+        <div class="trend-line"><span style="color:var(--muted)">Tendência no tempo maior</span><b id="htfTxt">—</b></div>
+        <div class="trend-line"><span style="color:var(--muted)">Força do sinal</span><b id="scoreTxt">—</b></div>
+        <div class="trend-line"><span style="color:var(--muted)">Volatilidade (ATR)</span><b id="atrTxt">—</b></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Backtest · estratégia neste ativo</span><span class="card-title" id="btMeta"></span></div>
+        <div class="sim-stats" id="btStats"><div class="sim-empty">Faça uma análise para ver como a estratégia teria se saído neste ativo.</div></div>
+        <div class="plan-note">Resultado de aplicar os sinais desta ferramenta nos candles carregados, com a mesma gestão da simulação (stop 1,5×ATR, parcial no alvo 1, filtro ADX). Passado não garante futuro — use para comparar ativos e tempos gráficos e evitar os que a estratégia não funciona.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Plano de operação sugerido</span></div>
+        <div class="plan-rows" id="planRows">
+          <div class="plan-note">O plano (entrada, stop e alvos) aparece aqui quando houver sinal de compra ou venda.</div>
+        </div>
+        <div class="calc-grid">
+          <div class="ctl"><label>Seu capital (R$ ou $)</label><input type="number" id="capital" value="1000" min="0"></div>
+          <div class="ctl"><label>Risco por operação (%)</label><input type="number" id="riskPct" value="1" min="0.1" max="10" step="0.1"></div>
+          <div class="calc-result" id="calcResult">Preencha o capital para calcular o tamanho da posição.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Indicadores · o que cada um diz</span></div>
+        <table class="ind-table" id="indTable">
+          <tr><td colspan="3" style="color:var(--muted)">Sem dados ainda.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px" id="simCard">
+    <div class="card-head">
+      <span class="card-title">🥊 Carteira do Desafiante v3 (simulação) — agressivo, calibrado pelos dados</span>
+      <button class="btn mini danger" id="btnResetSim">Zerar conta</button>
+    </div>
+    <div class="sim-stats" id="simStats"></div>
+    <div class="sim-actions">
+      <button class="btn" id="btnAutoScan">🤖 Analisar agora</button>
+      <span class="sim-hint" id="autoStatus">iniciando…</span>
+      <span class="sim-hint" id="simHint" style="display:none"></span>
+    </div>
+    <div class="plan-note">Meus critérios v3: sinal no 15m com força ≥ ±12 · ADX ≥ 14 · <b>tendência PLENA no 1h</b> (moderada não basta) · <b>4h a favor</b> (só opero na direção do dia) · backtest não-negativo no ativo · até 6 posições de 3% (máx. 4 na mesma direção) com alavancagem 3× · stop 1,5×ATR · <b>posição dimensionada com taxas embutidas, para o stop custar ~1R de verdade</b> · sem trava anti-revenge. Taxas de 0,1% por ponta descontadas.</div>
+    <div class="card-head"><span class="card-title">Posições abertas</span></div>
+    <div id="simPositions"><div class="sim-empty">Nenhuma posição aberta.</div></div>
+    <div class="card-head"><span class="card-title">Histórico de operações</span></div>
+    <div id="simHistory"><div class="sim-empty">Nenhuma operação fechada ainda. Sua taxa de acerto aparecerá aqui.</div></div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="card-head"><span class="card-title">🥊 Diário do Desafiante</span></div>
+    <div id="diaryBody" style="max-height:420px;overflow-y:auto"></div>
+  </div>
+
+  <details class="guide" id="guia">
+    <summary>📖 Guia do Iniciante — leia antes de operar</summary>
+    <div class="guide-body">
+      <h3>1. O que é daytrade?</h3>
+      <p>Daytrade é comprar e vender o mesmo ativo no mesmo dia, tentando lucrar com pequenas variações de preço. É a modalidade <b>mais difícil</b> do mercado: exige disciplina, gestão de risco e controle emocional. Estatísticas mostram que a grande maioria dos iniciantes perde dinheiro — por isso, <span class="hl">comece treinando sem dinheiro real</span> (anote as operações que faria e veja o resultado depois).</p>
+
+      <h3>2. Como usar esta ferramenta (passo a passo)</h3>
+      <ol>
+        <li><b>Escolha o mercado:</b> Cripto (funciona 24h, sem cadastro) ou Ações B3 (pregão ~10h–17h, precisa do token grátis da brapi.dev).</li>
+        <li><b>Escolha o ativo:</b> clique em um dos atalhos (BTCUSDT, PETR4...), digite o código — ou use o <b>📡 Radar</b> para varrer as 10 principais criptos de uma vez e ver onde há sinal agora.</li>
+        <li><b>Escolha o tempo gráfico:</b> para daytrade, os mais usados são <code>5m</code> e <code>15m</code>. Tempos maiores (1h, 4h, 1d) servem para enxergar a tendência principal.</li>
+        <li><b>Clique em Analisar.</b> A ferramenta busca os preços reais, calcula os indicadores e mostra o sinal: <span class="hl">COMPRA</span>, <span class="hl2">VENDA</span> ou NEUTRO/AGUARDE.</li>
+        <li><b>Tendência maior conferida automaticamente:</b> a ferramenta busca também o tempo gráfico maior (ex.: 15m → 1h) e <b>bloqueia sinais contra essa maré</b>. A linha "Tendência no tempo maior" mostra o resultado. Além disso, o filtro ADX bloqueia sinais quando o mercado está de lado, e o card de <b>Backtest</b> mostra como a estratégia teria se saído nos últimos candles do ativo — prefira operar ativos/tempos com backtest positivo.</li>
+        <li><b>Siga o plano:</b> se houver sinal, a ferramenta sugere <b>entrada</b>, <b>stop-loss</b> (onde sair se der errado) e <b>alvos</b> (onde realizar lucro). <span class="hl2">Nunca opere sem stop.</span></li>
+        <li><b>Use a calculadora de posição:</b> informe seu capital e quanto aceita arriscar por operação (1% é o padrão prudente). Ela diz a quantidade máxima a comprar/vender.</li>
+      </ol>
+
+      <h3>3. As 3 regras de ouro</h3>
+      <ul>
+        <li><b>Regra do 1%:</b> nunca arrisque mais de 1–2% do seu capital em uma única operação. Com 1%, você aguenta errar muitas vezes seguidas sem quebrar.</li>
+        <li><b>Stop-loss sempre:</b> defina ANTES de entrar o ponto onde admite que errou e sai. E cumpra — não "espere voltar".</li>
+        <li><b>Risco/retorno mínimo de 1:1,5:</b> só entre se o lucro possível (alvo) for pelo menos 1,5× maior que a perda possível (stop). A ferramenta já calcula isso.</li>
+      </ul>
+
+      <h3>4. O que significam os sinais</h3>
+      <ul>
+        <li><span class="hl">COMPRA FORTE / COMPRA</span> — a maioria dos indicadores aponta alta. Em compra, você lucra se o preço subir.</li>
+        <li><b>NEUTRO / AGUARDE</b> — indicadores divididos ou mercado de lado. <b>Ficar de fora também é uma posição.</b> Os melhores traders passam a maior parte do tempo esperando.</li>
+        <li><span class="hl2">VENDA / VENDA FORTE</span> — a maioria aponta queda. Se você está comprado, é hora de sair. "Vender a descoberto" (lucrar com a queda) é possível, mas é mais avançado — em cripto exige conta de futuros e em ações exige aluguel; <b>iniciante deve apenas interpretar como "não compre / saia"</b>.</li>
+      </ul>
+
+      <h3>5. Mini-glossário dos indicadores</h3>
+      <ul>
+        <li><b>Candle (vela):</b> cada barrinha do gráfico mostra abertura, máxima, mínima e fechamento do preço em um período. Verde = subiu, vermelho = caiu.</li>
+        <li><b>EMA (média móvel exponencial):</b> a "linha de tendência" do preço. Preço acima das médias e médias apontando para cima = tendência de alta.</li>
+        <li><b>RSI (força relativa):</b> mede se o ativo está "esticado". Abaixo de 30 = sobrevendido (caiu demais, pode reagir); acima de 70 = sobrecomprado (subiu demais, pode corrigir).</li>
+        <li><b>MACD:</b> mede o "embalo" (momentum) do movimento. Linha cruzando para cima da linha de sinal = força compradora ganhando.</li>
+        <li><b>Bandas de Bollinger:</b> um "túnel" em volta do preço. Preço colado na banda de baixo costuma indicar exagero de queda; na de cima, exagero de alta.</li>
+        <li><b>Estocástico:</b> parecido com o RSI; compara o fechamento atual com a faixa recente de preços.</li>
+        <li><b>VWAP:</b> preço médio ponderado pelo volume — referência usada pelos grandes players. Preço acima do VWAP = compradores no controle no dia.</li>
+        <li><b>ATR (volatilidade):</b> quanto o ativo costuma se mexer por candle. Usamos o ATR para posicionar o stop a uma distância "respirável".</li>
+        <li><b>Suporte / Resistência:</b> preços onde o mercado historicamente reage. Suporte = "chão" (tende a segurar quedas); resistência = "teto" (tende a frear altas).</li>
+      </ul>
+
+      <h3>6. Erros que destroem iniciantes (evite!)</h3>
+      <ul>
+        <li>Aumentar a mão depois de perder, para "recuperar" (revenge trading).</li>
+        <li>Tirar o stop ou alargá-lo quando o preço vai contra você.</li>
+        <li>Operar alavancado sem entender alavancagem.</li>
+        <li>Operar contra a tendência do tempo gráfico maior.</li>
+        <li>Operar o dia inteiro: 1–2 boas oportunidades por dia bastam.</li>
+      </ul>
+
+      <h3>7. Rotina sugerida para começar</h3>
+      <ol>
+        <li>Por 30 dias, use <b>somente a Conta de Simulação</b> desta página: quando houver sinal, clique em "Executar plano atual na simulação" e deixe a ferramenta acompanhar stop e alvos com saldo virtual de 10.000.</li>
+        <li>Calcule sua taxa de acerto e seu risco/retorno médio no fim do mês.</li>
+        <li>Só passe para dinheiro real se o resultado simulado for consistentemente positivo — e comece com pouco.</li>
+      </ol>
+    </div>
+  </details>
+</div>
+
+<script>
+'use strict';
+
+/* ============================== estado ============================== */
+const S = {
+  market: 'crypto',
+  symbol: 'BTCUSDT',
+  tf: '15m',
+  candles: [],          // {t,o,h,l,c,v}
+  timer: null,
+};
+
+const TF_CRYPTO = ['1m','5m','15m','1h','4h','1d'];
+const TF_B3 = ['1d'];   // intraday da B3 exige plano pago na brapi; diário é grátis
+const HTF_MAP = { '1m': '15m', '5m': '1h', '15m': '1h', '1h': '4h', '4h': '1d', '1d': '1w' };
+const PICKS_CRYPTO = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','LTCUSDT'];
+const PICKS_B3 = ['PETR4','VALE3','ITUB4','BBDC4','BBAS3','MGLU3'];
+
+const $ = id => document.getElementById(id);
+
+/* ============================== UI: controles ============================== */
+function renderTf() {
+  const tfs = S.market === 'crypto' ? TF_CRYPTO : TF_B3;
+  if (!tfs.includes(S.tf)) S.tf = tfs[tfs.length - 1];
+  $('segTf').innerHTML = tfs.map(t =>
+    `<button data-tf="${t}" class="${t === S.tf ? 'active' : ''}">${t}</button>`).join('');
+}
+function renderPicks() {
+  const picks = S.market === 'crypto' ? PICKS_CRYPTO : PICKS_B3;
+  $('quickPicks').innerHTML = picks.map(p =>
+    `<span class="chip ${p === S.symbol ? 'active' : ''}" data-sym="${p}">${p}</span>`).join('');
+}
+
+$('segMarket').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.market = b.dataset.m;
+  document.querySelectorAll('#segMarket button').forEach(x => x.classList.toggle('active', x === b));
+  $('tokenCtl').style.display = S.market === 'b3' ? '' : 'none';
+  S.symbol = S.market === 'crypto' ? 'BTCUSDT' : 'PETR4';
+  $('symbolInput').value = S.symbol;
+  renderTf(); renderPicks();
+});
+$('segTf').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.tf = b.dataset.tf; renderTf(); analyze();
+});
+$('quickPicks').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  S.symbol = c.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
+});
+$('btnAnalyze').addEventListener('click', () => analyze());
+$('symbolInput').addEventListener('keydown', e => { if (e.key === 'Enter') analyze(); });
+$('capital').addEventListener('input', () => renderCalc());
+$('riskPct').addEventListener('input', () => renderCalc());
+$('autoRefresh').addEventListener('change', scheduleRefresh);
+
+$('brapiToken').value = localStorage.getItem('brapiToken') || '';
+$('brapiToken').addEventListener('change', e => localStorage.setItem('brapiToken', e.target.value.trim()));
+
+function setStatus(cls, txt) {
+  $('statusDot').className = 'status-dot ' + cls;
+  $('statusTxt').textContent = txt;
+}
+function showError(msg) {
+  $('errBox').style.display = msg ? '' : 'none';
+  $('errBox').innerHTML = msg || '';
+}
+
+function scheduleRefresh() {
+  clearInterval(S.timer); S.timer = null;
+  if ($('autoRefresh').checked && S.candles.length) {
+    S.timer = setInterval(() => analyze(true), 30000);
+  }
+}
+
+/* ============================== dados ============================== */
+async function fetchCrypto(sym, tf) {
+  const url = `https://api.binance.com/api/v3/klines?symbol=${encodeURIComponent(sym)}&interval=${tf}&limit=300`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Binance respondeu ${r.status}. Confira o código do par (ex.: BTCUSDT).`);
+  const raw = await r.json();
+  return raw.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }));
+}
+
+async function fetchB3(sym, tf) {
+  const token = $('brapiToken').value.trim();
+  if (!token) throw new Error('Para ações da B3 é preciso um token gratuito. Crie em <a href="https://brapi.dev" target="_blank" style="color:var(--blue)">brapi.dev</a>, copie o token e cole no campo "Token brapi.dev".');
+  const url = `https://brapi.dev/api/quote/${encodeURIComponent(sym)}?range=3mo&interval=1d&token=${encodeURIComponent(token)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`brapi respondeu ${r.status}. Confira o código da ação (ex.: PETR4) e o token.`);
+  const j = await r.json();
+  const res = j.results && j.results[0];
+  const hist = res && res.historicalDataPrice;
+  if (!hist || !hist.length) throw new Error('Sem histórico para este ativo na brapi.');
+  return hist
+    .filter(d => d.open != null && d.close != null)
+    .map(d => ({ t: d.date * 1000, o: +d.open, h: +d.high, l: +d.low, c: +d.close, v: +(d.volume || 0) }));
+}
+
+/* ============================== indicadores ============================== */
+const closes = cs => cs.map(x => x.c);
+
+function sma(arr, p) {
+  const out = new Array(arr.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < arr.length; i++) {
+    sum += arr[i];
+    if (i >= p) sum -= arr[i - p];
+    if (i >= p - 1) out[i] = sum / p;
+  }
+  return out;
+}
+function ema(arr, p) {
+  const out = new Array(arr.length).fill(null);
+  const k = 2 / (p + 1);
+  let prev = null;
+  for (let i = 0; i < arr.length; i++) {
+    if (i === p - 1) {
+      let s = 0; for (let j = 0; j < p; j++) s += arr[j];
+      prev = s / p; out[i] = prev;
+    } else if (i >= p) {
+      prev = arr[i] * k + prev * (1 - k);
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+function rsi(arr, p = 14) {
+  const out = new Array(arr.length).fill(null);
+  let g = 0, l = 0;
+  for (let i = 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const up = Math.max(d, 0), dn = Math.max(-d, 0);
+    if (i <= p) { g += up; l += dn; if (i === p) { g /= p; l /= p; out[i] = 100 - 100 / (1 + (l === 0 ? 100 : g / l)); } }
+    else {
+      g = (g * (p - 1) + up) / p;
+      l = (l * (p - 1) + dn) / p;
+      out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+  }
+  return out;
+}
+function macd(arr, f = 12, s = 26, sig = 9) {
+  const ef = ema(arr, f), es = ema(arr, s);
+  const line = arr.map((_, i) => (ef[i] != null && es[i] != null) ? ef[i] - es[i] : null);
+  const first = line.findIndex(x => x != null);
+  const valid = line.slice(first);
+  const sigValid = ema(valid, sig);
+  const signal = new Array(arr.length).fill(null);
+  for (let i = 0; i < sigValid.length; i++) signal[first + i] = sigValid[i];
+  const hist = line.map((x, i) => (x != null && signal[i] != null) ? x - signal[i] : null);
+  return { line, signal, hist };
+}
+function bollinger(arr, p = 20, mult = 2) {
+  const mid = sma(arr, p);
+  const up = new Array(arr.length).fill(null), lo = new Array(arr.length).fill(null);
+  for (let i = p - 1; i < arr.length; i++) {
+    let s = 0;
+    for (let j = i - p + 1; j <= i; j++) s += (arr[j] - mid[i]) ** 2;
+    const sd = Math.sqrt(s / p);
+    up[i] = mid[i] + mult * sd; lo[i] = mid[i] - mult * sd;
+  }
+  return { mid, up, lo };
+}
+function stochastic(cs, p = 14, dP = 3) {
+  const k = new Array(cs.length).fill(null);
+  for (let i = p - 1; i < cs.length; i++) {
+    let hh = -Infinity, ll = Infinity;
+    for (let j = i - p + 1; j <= i; j++) { hh = Math.max(hh, cs[j].h); ll = Math.min(ll, cs[j].l); }
+    k[i] = hh === ll ? 50 : (cs[i].c - ll) / (hh - ll) * 100;
+  }
+  const valid = k.filter(x => x != null);
+  const dValid = sma(valid, dP);
+  const d = new Array(cs.length).fill(null);
+  const off = k.findIndex(x => x != null);
+  for (let i = 0; i < dValid.length; i++) d[off + i] = dValid[i];
+  return { k, d };
+}
+function atr(cs, p = 14) {
+  const out = new Array(cs.length).fill(null);
+  let prev = null;
+  for (let i = 1; i < cs.length; i++) {
+    const tr = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    if (i <= p) { prev = (prev == null ? 0 : prev) + tr; if (i === p) { prev /= p; out[i] = prev; } }
+    else { prev = (prev * (p - 1) + tr) / p; out[i] = prev; }
+  }
+  return out;
+}
+function vwap(cs) {
+  // VWAP da sessão atual (reinicia a cada dia UTC); em gráfico diário usa a janela toda
+  const out = new Array(cs.length).fill(null);
+  let pv = 0, vv = 0, day = null;
+  for (let i = 0; i < cs.length; i++) {
+    const d = new Date(cs[i].t).getUTCDate();
+    if (day !== null && d !== day && cs.length > 50) { pv = 0; vv = 0; }
+    day = d;
+    const tp = (cs[i].h + cs[i].l + cs[i].c) / 3;
+    pv += tp * cs[i].v; vv += cs[i].v;
+    out[i] = vv > 0 ? pv / vv : cs[i].c;
+  }
+  return out;
+}
+function pivots(cs, k = 5) {
+  const sup = [], res = [];
+  for (let i = k; i < cs.length - k; i++) {
+    let isHigh = true, isLow = true;
+    for (let j = i - k; j <= i + k; j++) {
+      if (cs[j].h > cs[i].h) isHigh = false;
+      if (cs[j].l < cs[i].l) isLow = false;
+    }
+    if (isHigh) res.push(cs[i].h);
+    if (isLow) sup.push(cs[i].l);
+  }
+  const last = cs[cs.length - 1].c;
+  const above = [...new Set(res.concat(sup))].filter(x => x > last).sort((a, b) => a - b).slice(0, 2);
+  const below = [...new Set(res.concat(sup))].filter(x => x < last).sort((a, b) => b - a).slice(0, 2);
+  return { res: above, sup: below };
+}
+
+/* ============================== motor de sinal ============================== */
+// ADX (força da tendência) com suavização de Wilder; também retorna +DI/-DI
+function adxCalc(cs, p = 14) {
+  const n = cs.length;
+  const out = { adx: new Array(n).fill(null), pdi: new Array(n).fill(null), mdi: new Array(n).fill(null) };
+  let trS = 0, pS = 0, mS = 0, adxPrev = null, dxSum = 0, dxCount = 0;
+  for (let i = 1; i < n; i++) {
+    const up = cs[i].h - cs[i - 1].h, dn = cs[i - 1].l - cs[i].l;
+    const pdm = (up > dn && up > 0) ? up : 0;
+    const mdm = (dn > up && dn > 0) ? dn : 0;
+    const tr = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    if (i <= p) { trS += tr; pS += pdm; mS += mdm; }
+    else { trS += tr - trS / p; pS += pdm - pS / p; mS += mdm - mS / p; }
+    if (i >= p) {
+      const pdi = trS > 0 ? 100 * pS / trS : 0;
+      const mdi = trS > 0 ? 100 * mS / trS : 0;
+      out.pdi[i] = pdi; out.mdi[i] = mdi;
+      const dx = (pdi + mdi) > 0 ? 100 * Math.abs(pdi - mdi) / (pdi + mdi) : 0;
+      if (dxCount < p) {
+        dxSum += dx; dxCount++;
+        if (dxCount === p) { adxPrev = dxSum / p; out.adx[i] = adxPrev; }
+      } else {
+        adxPrev = (adxPrev * (p - 1) + dx) / p;
+        out.adx[i] = adxPrev;
+      }
+    }
+  }
+  return out;
+}
+
+const ADX_MIN = 12; // abaixo disso o mercado é considerado lateral e sinais são bloqueados
+
+function computeInd(cs) {
+  const c = closes(cs);
+  return {
+    c, e9: ema(c, 9), e21: ema(c, 21), e50: ema(c, 50),
+    r: rsi(c), m: macd(c), bb: bollinger(c), st: stochastic(cs),
+    a: atr(cs), vw: vwap(cs), dmi: adxCalc(cs),
+  };
+}
+
+// votos dos indicadores na posição i — usa apenas dados até i, por isso a
+// mesma função serve para o sinal ao vivo e para o backtest
+function votesAt(cs, ind, i) {
+  const { e9, e21, e50, r, m, bb, st, vw } = ind;
+  const last = ind.c[i];
+  const fmt = n => formatPrice(n);
+
+  const votes = [];
+  // cada voto: {name, value, vote(-1..1), weight, expl}
+
+  // 1) Tendência pelas médias (peso 25)
+  let trendVote = 0, trendTxt = 'Indefinida', trendExpl = '';
+  if (e9[i] != null && e21[i] != null && e50[i] != null) {
+    const slope21 = e21[i] - e21[i - 3];
+    if (e9[i] > e21[i] && e21[i] > e50[i] && last > e21[i]) {
+      trendVote = 1; trendTxt = 'ALTA';
+      trendExpl = 'As médias estão alinhadas para cima (EMA9 > EMA21 > EMA50) e o preço está acima delas — compradores no controle.';
+    } else if (e9[i] < e21[i] && e21[i] < e50[i] && last < e21[i]) {
+      trendVote = -1; trendTxt = 'BAIXA';
+      trendExpl = 'As médias estão alinhadas para baixo (EMA9 < EMA21 < EMA50) e o preço está abaixo delas — vendedores no controle.';
+    } else if (e9[i] > e21[i] && slope21 > 0) {
+      trendVote = 0.5; trendTxt = 'Alta moderada';
+      trendExpl = 'A média curta cruzou acima da média de 21 e ela aponta para cima — possível início de movimento de alta.';
+    } else if (e9[i] < e21[i] && slope21 < 0) {
+      trendVote = -0.5; trendTxt = 'Baixa moderada';
+      trendExpl = 'A média curta cruzou abaixo da média de 21 e ela aponta para baixo — possível início de queda.';
+    } else {
+      trendTxt = 'Lateral'; trendExpl = 'Médias embaralhadas: o mercado está de lado, sem direção clara. Melhor esperar definição.';
+    }
+    votes.push({ name: 'Médias móveis (EMA 9/21/50)', value: `9:${fmt(e9[i])} 21:${fmt(e21[i])}`, vote: trendVote, weight: 25, expl: trendExpl });
+  }
+
+  // 2) MACD (peso 20)
+  if (m.line[i] != null && m.signal[i] != null) {
+    let v = 0, ex;
+    const crossUp = m.line[i] > m.signal[i] && m.line[i - 1] <= m.signal[i - 1];
+    const crossDn = m.line[i] < m.signal[i] && m.line[i - 1] >= m.signal[i - 1];
+    const histRising = m.hist[i] != null && m.hist[i - 1] != null && m.hist[i] > m.hist[i - 1];
+    if (crossUp) { v = 1; ex = 'O MACD acabou de cruzar para CIMA da linha de sinal — sinal clássico de entrada de força compradora.'; }
+    else if (crossDn) { v = -1; ex = 'O MACD acabou de cruzar para BAIXO da linha de sinal — sinal clássico de força vendedora.'; }
+    else if (m.line[i] > m.signal[i]) { v = histRising ? 0.75 : 0.4; ex = 'MACD acima da linha de sinal: o embalo segue comprador' + (histRising ? ' e ganhando força.' : ', mas perdendo um pouco de força.'); }
+    else { v = histRising ? -0.4 : -0.75; ex = 'MACD abaixo da linha de sinal: o embalo segue vendedor' + (histRising ? ', mas a pressão de queda está diminuindo.' : ' e ganhando força.'); }
+    votes.push({ name: 'MACD (12,26,9)', value: m.hist[i] >= 0 ? `hist +${fmt(m.hist[i])}` : `hist ${fmt(m.hist[i])}`, vote: v, weight: 20, expl: ex });
+  }
+
+  // 3) RSI (peso 15)
+  if (r[i] != null) {
+    let v = 0, ex;
+    const rv = r[i];
+    if (rv < 30) { v = 1; ex = `RSI em ${rv.toFixed(0)} (abaixo de 30): o ativo caiu demais e está "sobrevendido" — costuma reagir para cima.`; }
+    else if (rv < 45) { v = 0.4; ex = `RSI em ${rv.toFixed(0)}: levemente para o lado vendido; se a tendência for de alta, pode ser um bom desconto.`; }
+    else if (rv > 70) { v = -1; ex = `RSI em ${rv.toFixed(0)} (acima de 70): o ativo subiu demais e está "sobrecomprado" — risco de correção. Evite comprar no topo.`; }
+    else if (rv > 55) { v = -0.3; ex = `RSI em ${rv.toFixed(0)}: levemente esticado para cima, mas ainda sem exagero.`; }
+    else { v = 0; ex = `RSI em ${rv.toFixed(0)}: zona neutra, sem exagero para nenhum lado.`; }
+    votes.push({ name: 'RSI (14)', value: rv.toFixed(1), vote: v, weight: 15, expl: ex });
+  }
+
+  // 4) Estocástico (peso 10)
+  if (st.k[i] != null && st.d[i] != null) {
+    let v = 0, ex;
+    const kv = st.k[i], dv = st.d[i];
+    if (kv < 20 && kv > dv) { v = 1; ex = 'Estocástico saindo da zona de sobrevenda com cruzamento para cima — gatilho comprador.'; }
+    else if (kv < 20) { v = 0.5; ex = 'Estocástico em zona de sobrevenda: queda esticada, fique atento a uma reação de alta.'; }
+    else if (kv > 80 && kv < dv) { v = -1; ex = 'Estocástico saindo da zona de sobrecompra com cruzamento para baixo — gatilho vendedor.'; }
+    else if (kv > 80) { v = -0.5; ex = 'Estocástico em zona de sobrecompra: alta esticada, cuidado para não comprar no topo.'; }
+    else { v = kv > dv ? 0.25 : -0.25; ex = kv > dv ? 'Estocástico apontando para cima na zona neutra.' : 'Estocástico apontando para baixo na zona neutra.'; }
+    votes.push({ name: 'Estocástico (14,3)', value: `K:${kv.toFixed(0)} D:${dv.toFixed(0)}`, vote: v, weight: 10, expl: ex });
+  }
+
+  // 5) Bollinger (peso 10)
+  if (bb.up[i] != null) {
+    let v = 0, ex;
+    const range = bb.up[i] - bb.lo[i];
+    const pos = range > 0 ? (last - bb.lo[i]) / range : 0.5;
+    if (pos <= 0.05) { v = 1; ex = 'Preço colado na banda inferior de Bollinger: movimento de queda esticado, chance de repique.'; }
+    else if (pos <= 0.25) { v = 0.5; ex = 'Preço na parte de baixo das bandas: mais perto do "chão" estatístico do que do teto.'; }
+    else if (pos >= 0.95) { v = -1; ex = 'Preço colado na banda superior: alta esticada, risco de correção de curto prazo.'; }
+    else if (pos >= 0.75) { v = -0.5; ex = 'Preço na parte de cima das bandas: cuidado com entradas de compra atrasadas.'; }
+    else { v = 0; ex = 'Preço no meio das bandas de Bollinger: região neutra.'; }
+    votes.push({ name: 'Bandas de Bollinger', value: `${(pos * 100).toFixed(0)}% da banda`, vote: v, weight: 10, expl: ex });
+  }
+
+  // 6) VWAP (peso 10)
+  if (vw[i] != null) {
+    const above = last > vw[i];
+    const dist = Math.abs(last - vw[i]) / vw[i];
+    const v = dist < 0.0005 ? 0 : (above ? 0.7 : -0.7);
+    const ex = dist < 0.0005
+      ? 'Preço exatamente no VWAP: mercado em equilíbrio nesta sessão.'
+      : above
+        ? 'Preço acima do VWAP: os compradores estão pagando acima do preço médio do dia — domínio comprador.'
+        : 'Preço abaixo do VWAP: o mercado opera abaixo do preço médio do dia — domínio vendedor.';
+    votes.push({ name: 'VWAP', value: fmt(vw[i]), vote: v, weight: 10, expl: ex });
+  }
+
+  // 7) Volume (peso 10)
+  {
+    const volWin = cs.slice(Math.max(0, i - 20), i);
+    const volAvg = volWin.length ? volWin.reduce((s, x) => s + x.v, 0) / volWin.length : 0;
+    const lastVol = cs[i].v;
+    const bull = cs[i].c >= cs[i].o;
+    let v = 0, ex;
+    if (volAvg > 0 && lastVol > volAvg * 1.5) {
+      v = bull ? 0.8 : -0.8;
+      ex = bull
+        ? 'Volume bem acima da média em um candle de alta: o movimento comprador tem participação real, não é "fumaça".'
+        : 'Volume bem acima da média em um candle de queda: pressão vendedora forte e com convicção.';
+    } else if (volAvg > 0 && lastVol < volAvg * 0.5) {
+      ex = 'Volume fraco: movimento sem convicção. Sinais com volume baixo falham mais — reduza a confiança.';
+    } else {
+      v = bull ? 0.2 : -0.2;
+      ex = 'Volume dentro do normal para o período.';
+    }
+    votes.push({ name: 'Volume', value: volAvg > 0 ? `${(lastVol / volAvg).toFixed(1)}× a média` : '—', vote: v, weight: 10, expl: ex });
+  }
+
+  return { votes, trendTxt };
+}
+
+// score -100..100 (ignora linhas informativas de peso 0)
+function scoreOf(votes) {
+  const totalW = votes.reduce((s, x) => s + x.weight, 0);
+  return totalW ? Math.round(votes.reduce((s, x) => s + x.vote * x.weight, 0) / totalW * 100) : 0;
+}
+
+function classify(score) {
+  if (score >= 30) return { cls: 'buy', label: 'COMPRA FORTE', sub: 'A grande maioria dos indicadores aponta para cima. Cenário favorável para compra — sempre com stop.' };
+  if (score >= 10) return { cls: 'buy', label: 'COMPRA', sub: 'Os indicadores pendem para o lado comprador, mas sem unanimidade. Considere entrada menor ou aguarde mais confirmação.' };
+  if (score <= -30) return { cls: 'sell', label: 'VENDA FORTE', sub: 'A grande maioria dos indicadores aponta para baixo. Se você está comprado, é sinal de saída. Não compre agora.' };
+  if (score <= -10) return { cls: 'sell', label: 'VENDA', sub: 'Os indicadores pendem para o lado vendedor. Evite comprar; se estiver posicionado, avalie reduzir ou sair.' };
+  return { cls: 'neutral', label: 'AGUARDE', sub: 'Indicadores divididos ou mercado de lado. A melhor operação agora é NÃO operar — espere o mercado mostrar direção.' };
+}
+
+function analyzeSignals(cs) {
+  const ind = computeInd(cs);
+  const i = cs.length - 1;
+  const { votes, trendTxt } = votesAt(cs, ind, i);
+  const score = scoreOf(votes);
+  let { cls, label, sub } = classify(score);
+
+  // filtro anti-mercado-lateral: ADX fraco bloqueia compra/venda
+  const adxV = ind.dmi.adx[i];
+  if (adxV != null && adxV < ADX_MIN && cls !== 'neutral') {
+    sub = `O placar dos indicadores era de ${label}, mas o ADX está em ${adxV.toFixed(0)} (abaixo de ${ADX_MIN}): mercado de lado, onde a maioria dos sinais falha. Filtro de segurança ativado — aguarde o mercado destravar.`;
+    cls = 'neutral'; label = 'AGUARDE';
+  }
+  votes.push({
+    name: 'Força da tendência (ADX 14)',
+    value: adxV != null ? adxV.toFixed(1) : '—',
+    vote: 0, weight: 0,
+    expl: adxV == null ? 'Sem dados suficientes para calcular.'
+      : adxV < ADX_MIN ? `Abaixo de ${ADX_MIN}: tendência fraca, mercado de lado. O filtro de segurança bloqueia compras e vendas nessa condição.`
+      : adxV < 25 ? 'Tendência ganhando força — sinais liberados.'
+      : 'Tendência forte em andamento — sinais a favor dela são os mais confiáveis.',
+  });
+
+  return { votes, score, cls, label, sub, trendTxt, adxV, e9: ind.e9, e21: ind.e21, e50: ind.e50, bb: ind.bb, r: ind.r, atr: ind.a[i], vw: ind.vw, piv: pivots(cs) };
+}
+
+// tendência resumida de uma série (usada para o tempo gráfico maior)
+function trendOf(cs) {
+  const c = closes(cs);
+  const i = c.length - 1;
+  const e9v = ema(c, 9)[i], e21a = ema(c, 21), e50v = ema(c, 50)[i];
+  const e21v = e21a[i], slope = e21v != null && e21a[i - 3] != null ? e21v - e21a[i - 3] : 0;
+  const last = c[i];
+  if (e9v == null || e21v == null || e50v == null) return { dir: 0, txt: 'indefinida' };
+  if (e9v > e21v && e21v > e50v && last > e21v) return { dir: 1, txt: 'ALTA' };
+  if (e9v < e21v && e21v < e50v && last < e21v) return { dir: -1, txt: 'BAIXA' };
+  if (e9v > e21v && slope > 0) return { dir: 0.5, txt: 'alta moderada' };
+  if (e9v < e21v && slope < 0) return { dir: -0.5, txt: 'baixa moderada' };
+  return { dir: 0, txt: 'lateral' };
+}
+
+// aplica o filtro multi-tempo a um resultado de análise (muda cls/label/sub
+// e adiciona a linha informativa) — usado pela análise principal e pelo radar
+function applyHtfGate(res, htfInfo, tf, htfName) {
+  if ((res.cls === 'buy' && htfInfo.dir < 0) || (res.cls === 'sell' && htfInfo.dir > 0)) {
+    res.sub += ` ⚠ O ${htfName} aponta ${htfInfo.txt} — operando CONTRA a maré maior (sangue nos olhos não bloqueia).`;
+  } else if (res.cls !== 'neutral' && ((res.cls === 'buy' && htfInfo.dir > 0) || (res.cls === 'sell' && htfInfo.dir < 0))) {
+    res.sub += ` O tempo maior (${htfName}) confirma a direção — sinal mais confiável.`;
+  }
+  res.votes.unshift({
+    name: `Tendência no ${htfName} (tempo maior)`,
+    value: htfInfo.txt, vote: htfInfo.dir, weight: 0,
+    expl: 'Filtro multi-tempo: operar na direção da maré maior aumenta a taxa de acerto. ' + (
+      htfInfo.dir > 0 ? `O ${htfName} está em alta — apenas compras liberadas.` :
+      htfInfo.dir < 0 ? `O ${htfName} está em baixa — apenas vendas liberadas.` :
+      `O ${htfName} está sem direção clara — sinais dos dois lados permitidos, com cautela.`),
+  });
+}
+
+/* ============================== backtest ============================== */
+// aplica os MESMOS sinais (votesAt + filtro ADX) nos candles carregados,
+// gerenciando cada trade como a simulação: stop 1,5×ATR, parcial no alvo 1
+// com stop movido para a entrada, saída no alvo 2 ou no stop
+function backtest(cs) {
+  const ind = computeInd(cs);
+  const results = [];
+  let pos = null;
+  for (let i = 60; i < cs.length; i++) {
+    if (pos) {
+      const hi = cs[i].h, lo = cs[i].l;
+      if (pos.side === 'compra') {
+        if (lo <= pos.stop) { pos.r += pos.size * ((pos.stop - pos.entry) / pos.risk); results.push(pos.r); pos = null; continue; }
+        if (!pos.half && hi >= pos.t1) { pos.r += 0.5 * 1.5; pos.size = 0.5; pos.half = true; pos.stop = pos.entry; }
+        if (hi >= pos.t2) { pos.r += pos.size * 2.5; results.push(pos.r); pos = null; }
+      } else {
+        if (hi >= pos.stop) { pos.r += pos.size * ((pos.entry - pos.stop) / pos.risk); results.push(pos.r); pos = null; continue; }
+        if (!pos.half && lo <= pos.t1) { pos.r += 0.5 * 1.5; pos.size = 0.5; pos.half = true; pos.stop = pos.entry; }
+        if (lo <= pos.t2) { pos.r += pos.size * 2.5; results.push(pos.r); pos = null; }
+      }
+      continue;
+    }
+    const adxV = ind.dmi.adx[i];
+    if (adxV == null || adxV < ADX_MIN) continue;
+    const score = scoreOf(votesAt(cs, ind, i).votes);
+    if (Math.abs(score) < 10) continue;
+    const a = ind.a[i];
+    if (!a) continue;
+    const entry = cs[i].c, risk = 1.5 * a;
+    pos = score > 0
+      ? { side: 'compra', entry, risk, stop: entry - risk, t1: entry + 1.5 * risk, t2: entry + 2.5 * risk, size: 1, half: false, r: 0 }
+      : { side: 'venda', entry, risk, stop: entry + risk, t1: entry - 1.5 * risk, t2: entry - 2.5 * risk, size: 1, half: false, r: 0 };
+  }
+  if (pos) { // trade ainda aberto no fim da janela: fecha no último preço
+    const last = cs[cs.length - 1].c;
+    pos.r += pos.size * ((pos.side === 'compra' ? last - pos.entry : pos.entry - last) / pos.risk);
+    results.push(pos.r);
+  }
+  const n = results.length;
+  const totalR = results.reduce((s, r) => s + r, 0);
+  return {
+    n,
+    winRate: n ? results.filter(r => r > 0).length / n * 100 : null,
+    totalR,
+    avgR: n ? totalR / n : null,
+  };
+}
+
+/* ============================== plano de operação ============================== */
+function buildPlan(res, cs) {
+  const last = cs[cs.length - 1].c;
+  const a = res.atr || (last * 0.005);
+  const rows = [];
+  let plan = null;
+  if (res.cls === 'buy') {
+    const entry = last;
+    const stop = entry - 1.5 * a;
+    const t1 = entry + 1.5 * (entry - stop);
+    const t2 = entry + 2.5 * (entry - stop);
+    plan = { side: 'compra', entry, stop, t1, t2 };
+    rows.push(['Direção', '<span class="up">COMPRA (lucra se subir)</span>']);
+    rows.push(['Entrada sugerida', formatPrice(entry)]);
+    rows.push(['Stop-loss (saída se errar)', `<span class="down">${formatPrice(stop)}</span> <span style="color:var(--muted);font-weight:400">(−${((entry - stop) / entry * 100).toFixed(2)}%)</span>`]);
+    rows.push(['Alvo 1 (realize metade)', `<span class="up">${formatPrice(t1)}</span> <span style="color:var(--muted);font-weight:400">(+${((t1 - entry) / entry * 100).toFixed(2)}%)</span>`]);
+    rows.push(['Alvo 2 (realize o resto)', `<span class="up">${formatPrice(t2)}</span> <span style="color:var(--muted);font-weight:400">(+${((t2 - entry) / entry * 100).toFixed(2)}%)</span>`]);
+    rows.push(['Risco / retorno', '1 : 1,5 (alvo 1) · 1 : 2,5 (alvo 2)']);
+  } else if (res.cls === 'sell') {
+    const entry = last;
+    const stop = entry + 1.5 * a;
+    const t1 = entry - 1.5 * (stop - entry);
+    const t2 = entry - 2.5 * (stop - entry);
+    plan = { side: 'venda', entry, stop, t1, t2 };
+    rows.push(['Direção', '<span class="down">VENDA (lucra se cair)</span>']);
+    rows.push(['Entrada sugerida', formatPrice(entry)]);
+    rows.push(['Stop-loss (saída se errar)', `<span class="down">${formatPrice(stop)}</span> <span style="color:var(--muted);font-weight:400">(+${((stop - entry) / entry * 100).toFixed(2)}%)</span>`]);
+    rows.push(['Alvo 1 (realize metade)', `<span class="up">${formatPrice(t1)}</span>`]);
+    rows.push(['Alvo 2 (realize o resto)', `<span class="up">${formatPrice(t2)}</span>`]);
+    rows.push(['Risco / retorno', '1 : 1,5 (alvo 1) · 1 : 2,5 (alvo 2)']);
+  }
+
+  let html = rows.map(r => `<div class="plan-row"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join('');
+  if (!plan) {
+    html = '<div class="plan-note">Sinal neutro: <b>não há plano de operação</b>. Ficar de fora também é estratégia — aguarde o próximo sinal de compra ou venda.</div>';
+  } else {
+    html += `<div class="plan-note">Como executar: entre perto da entrada sugerida, coloque o stop-loss <b>imediatamente</b> na corretora e os alvos como ordens de venda${plan.side === 'venda' ? ' (venda a descoberto é avançado — iniciante deve interpretar este sinal apenas como "não compre / saia da posição")' : ''}. Ao atingir o alvo 1, mova o stop para o preço de entrada (assim a operação não vira prejuízo).</div>`;
+  }
+  $('planRows').innerHTML = html;
+  S.plan = plan;
+  renderCalc();
+}
+
+function renderCalc() {
+  const cap = parseFloat($('capital').value) || 0;
+  const rp = parseFloat($('riskPct').value) || 1;
+  const el = $('calcResult');
+  if (!S.plan || !cap) {
+    el.innerHTML = S.plan ? 'Preencha o capital para calcular o tamanho da posição.' :
+      'Sem sinal ativo: a calculadora aparece quando houver plano de compra ou venda.';
+    return;
+  }
+  const riskMoney = cap * rp / 100;
+  const perUnit = Math.abs(S.plan.entry - S.plan.stop);
+  const qty = perUnit > 0 ? riskMoney / perUnit : 0;
+  const notional = qty * S.plan.entry;
+  el.innerHTML = `Arriscando <b>${rp}%</b> (= ${money(riskMoney)}), você pode operar até <b>${qty < 1 ? qty.toFixed(6) : qty.toFixed(2)}</b> unidades (≈ ${money(notional)} de posição). Se o stop for atingido, a perda fica limitada a ${money(riskMoney)}.` +
+    (notional > cap ? ' <span class="down">Atenção: isso exigiria alavancagem — iniciante não deve usar. Limite a posição ao seu capital.</span>' : '');
+}
+
+/* ============================== render: tabela de indicadores ============================== */
+function renderIndicators(res) {
+  $('indTable').innerHTML = res.votes.map(v => {
+    const cls = v.vote >= 0.35 ? 'buy' : v.vote <= -0.35 ? 'sell' : 'neutral';
+    const txt = cls === 'buy' ? 'COMPRA' : cls === 'sell' ? 'VENDA' : 'NEUTRO';
+    return `<tr>
+      <td><div class="ind-name">${v.name}</div><div class="ind-val">${v.value}</div><div class="ind-expl">${v.expl}</div></td>
+      <td style="text-align:right;white-space:nowrap"><span class="vote ${cls}">${txt}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ============================== gráfico (canvas puro) ============================== */
+function drawChart(cs, res) {
+  const cv = $('chart'), ctx = cv.getContext('2d');
+  const rcv = $('rsiChart'), rctx = rcv.getContext('2d');
+  $('emptyChart').style.display = 'none';
+  cv.style.display = ''; rcv.style.display = '';
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = 380, RH = 90;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr);
+  rcv.width = W * dpr; rcv.height = RH * dpr; rctx.scale(dpr, dpr);
+
+  const N = Math.min(cs.length, 120);
+  const data = cs.slice(-N);
+  const off = cs.length - N;
+  const padR = 64, padT = 10, padB = 6;
+  const volH = 48;
+  const priceH = H - padT - padB - volH;
+
+  let hi = -Infinity, lo = Infinity, vmax = 0;
+  for (const d of data) { hi = Math.max(hi, d.h); lo = Math.min(lo, d.l); vmax = Math.max(vmax, d.v); }
+  for (const lvl of res.piv.res.concat(res.piv.sup)) { hi = Math.max(hi, lvl); lo = Math.min(lo, lvl); }
+  const pad = (hi - lo) * 0.04; hi += pad; lo -= pad;
+
+  const x = i => (i + 0.5) * (W - padR) / N;
+  const y = p => padT + (hi - p) / (hi - lo) * priceH;
+  const cw = Math.max(2, (W - padR) / N * 0.62);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // grid + eixo de preços
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.fillStyle = '#7d8694'; ctx.strokeStyle = '#1c212a'; ctx.lineWidth = 1;
+  const steps = 6;
+  for (let s = 0; s <= steps; s++) {
+    const p = lo + (hi - lo) * s / steps;
+    const yy = y(p);
+    ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+    ctx.fillText(formatPrice(p), W - padR + 6, yy + 3);
+  }
+
+  // bandas de bollinger (faixa)
+  const bb = res.bb;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < N; i++) {
+    const gi = off + i; if (bb.up[gi] == null) continue;
+    const xx = x(i), yy = y(bb.up[gi]);
+    if (!started) { ctx.moveTo(xx, yy); started = true; } else ctx.lineTo(xx, yy);
+  }
+  for (let i = N - 1; i >= 0; i--) {
+    const gi = off + i; if (bb.lo[gi] == null) continue;
+    ctx.lineTo(x(i), y(bb.lo[gi]));
+  }
+  ctx.closePath(); ctx.fillStyle = 'rgba(86,98,115,0.10)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(86,98,115,0.45)'; ctx.lineWidth = 1;
+  strokeSeries(ctx, bb.up, off, N, x, y); strokeSeries(ctx, bb.lo, off, N, x, y);
+
+  // suportes / resistências
+  for (const lvl of res.piv.res) hline(ctx, y(lvl), W - padR, 'rgba(231,76,60,0.55)');
+  for (const lvl of res.piv.sup) hline(ctx, y(lvl), W - padR, 'rgba(46,204,113,0.55)');
+
+  // volume
+  for (let i = 0; i < N; i++) {
+    const d = data[i];
+    ctx.fillStyle = d.c >= d.o ? 'rgba(46,204,113,0.35)' : 'rgba(231,76,60,0.35)';
+    const vh = vmax > 0 ? d.v / vmax * (volH - 6) : 0;
+    ctx.fillRect(x(i) - cw / 2, H - padB - vh, cw, vh);
+  }
+
+  // candles
+  for (let i = 0; i < N; i++) {
+    const d = data[i];
+    const up = d.c >= d.o;
+    const col = up ? '#2ecc71' : '#e74c3c';
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x(i), y(d.h)); ctx.lineTo(x(i), y(d.l)); ctx.stroke();
+    const yo = y(d.o), yc = y(d.c);
+    ctx.fillRect(x(i) - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yc - yo)));
+  }
+
+  // EMAs
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#4aa3e8'; strokeSeries(ctx, res.e9, off, N, x, y);
+  ctx.strokeStyle = '#f0b429'; strokeSeries(ctx, res.e21, off, N, x, y);
+  ctx.strokeStyle = '#b07cc6'; strokeSeries(ctx, res.e50, off, N, x, y);
+
+  // linha do último preço
+  const last = data[N - 1].c;
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = '#e8e6e1'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, y(last)); ctx.lineTo(W - padR, y(last)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = data[N - 1].c >= data[N - 1].o ? '#2ecc71' : '#e74c3c';
+  ctx.fillRect(W - padR + 2, y(last) - 9, padR - 4, 16);
+  ctx.fillStyle = '#0d0f12'; ctx.fillText(formatPrice(last), W - padR + 6, y(last) + 3);
+
+  // ----- RSI -----
+  rctx.clearRect(0, 0, W, RH);
+  const ry = v => 6 + (100 - v) / 100 * (RH - 12);
+  rctx.font = '9px "IBM Plex Mono", monospace';
+  for (const lvl of [70, 50, 30]) {
+    rctx.strokeStyle = lvl === 50 ? '#1c212a' : 'rgba(240,180,41,0.25)';
+    rctx.beginPath(); rctx.moveTo(0, ry(lvl)); rctx.lineTo(W - padR, ry(lvl)); rctx.stroke();
+    rctx.fillStyle = '#566273'; rctx.fillText('RSI ' + lvl, W - padR + 6, ry(lvl) + 3);
+  }
+  rctx.strokeStyle = '#4aa3e8'; rctx.lineWidth = 1.4;
+  rctx.beginPath(); started = false;
+  for (let i = 0; i < N; i++) {
+    const gi = off + i; if (res.r[gi] == null) continue;
+    const xx = x(i), yy = ry(res.r[gi]);
+    if (!started) { rctx.moveTo(xx, yy); started = true; } else rctx.lineTo(xx, yy);
+  }
+  rctx.stroke();
+}
+function strokeSeries(ctx, arr, off, N, x, y) {
+  ctx.beginPath(); let st = false;
+  for (let i = 0; i < N; i++) {
+    const v = arr[off + i]; if (v == null) continue;
+    if (!st) { ctx.moveTo(x(i), y(v)); st = true; } else ctx.lineTo(x(i), y(v));
+  }
+  ctx.stroke();
+}
+function hline(ctx, yy, w, col) {
+  ctx.setLineDash([6, 4]); ctx.strokeStyle = col; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(w, yy); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ============================== formatação ============================== */
+function formatPrice(n) {
+  if (n == null || !isFinite(n)) return '—';
+  const abs = Math.abs(n);
+  const dec = abs >= 1000 ? 2 : abs >= 100 ? 2 : abs >= 10 ? 3 : abs >= 1 ? 4 : abs >= 0.01 ? 5 : 8;
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function money(n) {
+  return (S.market === 'b3' ? 'R$ ' : '$ ') + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* ============================== conta de simulação ============================== */
+const SIM_KEY = 'simClaudeAggroV3_v1';
+const SIM_START = 10000;
+const SIM_FEE = 0.001;          // 0,1% por ponta, como numa corretora real
+const REVENGE_LOCK_MIN = 0;     // sangue nos olhos não conhece pausa
+
+function loadSim() {
+  try {
+    const j = JSON.parse(localStorage.getItem(SIM_KEY));
+    if (j && typeof j.balance === 'number' && Array.isArray(j.positions) && Array.isArray(j.history)) { if (!Array.isArray(j.diary)) j.diary = []; return j; }
+  } catch (e) {}
+  return { balance: SIM_START, positions: [], history: [], diary: [] };
+}
+function saveSim() { localStorage.setItem(SIM_KEY, JSON.stringify(S.sim)); }
+
+function fmtQty(q) { return q >= 100 ? q.toFixed(0) : q >= 1 ? q.toFixed(2) : q.toFixed(6); }
+function moneyFor(market, n) {
+  const sign = n < 0 ? '−' : '';
+  return sign + (market === 'b3' ? 'R$ ' : '$ ') + Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function simOpen() {
+  const hint = $('simHint');
+  if (!S.plan || !S.candles.length) {
+    hint.innerHTML = '<span class="down">Sem plano ativo agora (sinal AGUARDE). Espere um sinal de compra ou venda.</span>';
+    return;
+  }
+  // trava anti-revenge: stop recente bloqueia novas entradas
+  if (S.sim.lockUntil && Date.now() < S.sim.lockUntil) {
+    const min = Math.ceil((S.sim.lockUntil - Date.now()) / 60000);
+    hint.innerHTML = `<span class="down">🛡 Trava anti-revenge: você tomou um stop há pouco. Novas entradas em ${min} min — use o tempo para anotar o que o trade ensinou, não para "recuperar".</span>`;
+    return;
+  }
+  // aviso de correlação: criptos andam juntas, mesma direção = mesma aposta dobrada
+  const corr = S.market === 'crypto'
+    ? S.sim.positions.find(p => p.market === 'crypto' && p.side === S.plan.side && p.symbol !== S.symbol)
+    : null;
+  const corrKey = S.symbol + '|' + S.plan.side;
+  if (corr && S.corrConfirm !== corrKey) {
+    S.corrConfirm = corrKey;
+    hint.innerHTML = `<span style="color:var(--yellow)">⚠ Você já está em ${corr.side.toUpperCase()} de ${corr.symbol}, e criptos se movem juntas — abrir ${S.symbol} na mesma direção praticamente dobra a mesma aposta (foi assim que seus dois stops vieram juntos). Se entende o risco, toque de novo para confirmar.</span>`;
+    return;
+  }
+  S.corrConfirm = null;
+  const rp = parseFloat($('riskPct').value) || 1;
+  const perUnit = Math.abs(S.plan.entry - S.plan.stop);
+  if (perUnit <= 0) return;
+  // capital livre = saldo menos o que já está alocado nas posições abertas,
+  // para que a soma das posições nunca passe do saldo (sem alavancagem)
+  const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
+  const free = S.sim.balance - allocated;
+  if (free <= 0) {
+    hint.innerHTML = `<span class="down">Limite de capital atingido: ${moneyFor(S.market, allocated)} já posicionados (teto: ${moneyFor(S.market, S.sim.balance)} = 1× o saldo, sem alavancagem). Não é o risco % que bloqueia — é o tamanho das posições: stop justo exige posição grande. Feche alguma posição ou use um tempo gráfico maior (stop mais largo ocupa menos capital).</span>`;
+    return;
+  }
+  const qtyRisk = (S.sim.balance * rp / 100) / perUnit;
+  let qty = qtyRisk;
+  if (qty * S.plan.entry > free) qty = free / S.plan.entry;
+  if (qty <= 0) {
+    hint.innerHTML = '<span class="down">Saldo insuficiente. Zere a conta para recomeçar.</span>';
+    return;
+  }
+  const pos = {
+    id: Date.now(),
+    symbol: S.symbol, market: S.market, tf: S.tf,
+    side: S.plan.side,                       // 'compra' | 'venda'
+    qty, entry: S.plan.entry, stop: S.plan.stop, t1: S.plan.t1, t2: S.plan.t2,
+    riskPerUnit: perUnit, halfTaken: false,
+    openedAt: Date.now(),
+  };
+  S.sim.positions.push(pos);
+  saveSim(); renderSim();
+  const effRisk = qty * perUnit / S.sim.balance * 100;
+  hint.innerHTML = `<span class="up">Posição aberta: ${pos.side.toUpperCase()} ${fmtQty(qty)} ${pos.symbol}. O stop e os alvos serão monitorados automaticamente a cada atualização.</span>` +
+    (qty < qtyRisk * 0.999 ? ` <span style="color:var(--yellow)">Posição limitada pelo capital livre: risco efetivo ≈ ${effRisk.toFixed(2)}% (pedido: ${rp}%). Stop mais largo (tempo gráfico maior) = posições menores = mais entradas simultâneas.</span>` : '');
+}
+
+function simCloseQty(pos, qty, price, reason) {
+  const fee = (pos.entry + price) * qty * SIM_FEE; // taxa de entrada + saída desta parte
+  const pnl = (pos.side === 'compra' ? price - pos.entry : pos.entry - price) * qty - fee;
+  S.sim.balance += pnl;
+  // trava anti-revenge: depois de um stop cheio, sem novas entradas por um tempo
+  if (reason === 'stop-loss') S.sim.lockUntil = Date.now() + REVENGE_LOCK_MIN * 60000;
+  S.sim.history.unshift({
+    closedAt: Date.now(), symbol: pos.symbol, market: pos.market, tf: pos.tf,
+    side: pos.side, qty, entry: pos.entry, exit: price, pnl, reason,
+    r: pos.riskPerUnit > 0 ? pnl / (pos.riskPerUnit * qty) : 0,
+  });
+  pos.qty -= qty;
+}
+
+// chamado a cada atualização de dados do ativo em tela; percorre todos os
+// candles desde a entrada (ou desde a última checagem), de modo que stop e
+// alvos atingidos enquanto a página esteve fechada são processados retroativamente
+function simUpdate(sym, cs) {
+  const period = cs.length > 1 ? cs[1].t - cs[0].t : 0;
+  let changed = false;
+  for (const pos of S.sim.positions) {
+    if (pos.symbol !== sym || pos.qty <= 0) continue;
+    for (const candle of cs) {
+      if (candle.t + period <= pos.openedAt) continue;          // terminou antes da entrada
+      if (pos.lastT != null && candle.t < pos.lastT) continue;  // já processado
+      // se a posição foi aberta no meio do candle, a máxima/mínima dele
+      // incluem movimento anterior à entrada — nesse caso usa só o fechamento
+      const openedThisCandle = pos.openedAt > candle.t;
+      const hi = openedThisCandle ? candle.c : candle.h;
+      const lo = openedThisCandle ? candle.c : candle.l;
+      if (pos.side === 'compra') {
+        if (lo <= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; break; }
+        if (!pos.halfTaken && hi >= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+        if (pos.qty > 0 && hi >= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; break; }
+      } else {
+        if (hi >= pos.stop) { simCloseQty(pos, pos.qty, pos.stop, pos.halfTaken ? 'stop no 0x0' : 'stop-loss'); changed = true; break; }
+        if (!pos.halfTaken && lo <= pos.t1) { simCloseQty(pos, pos.qty / 2, pos.t1, 'alvo 1'); pos.halfTaken = true; pos.stop = pos.entry; changed = true; }
+        if (pos.qty > 0 && lo <= pos.t2) { simCloseQty(pos, pos.qty, pos.t2, 'alvo 2'); changed = true; break; }
+      }
+    }
+    if (pos.qty > 0 && cs.length) { pos.lastT = cs[cs.length - 1].t; changed = true; }
+  }
+  const before = S.sim.positions.length;
+  S.sim.positions = S.sim.positions.filter(p => p.qty > 0);
+  if (changed || S.sim.positions.length !== before) saveSim();
+  renderSim();
+}
+
+function simManualClose(id) {
+  const pos = S.sim.positions.find(p => p.id === id);
+  if (!pos) return;
+  if (pos.symbol !== S.symbol || !S.candles.length) {
+    $('simHint').innerHTML = `<span class="down">Para fechar ${pos.symbol} manualmente, primeiro analise esse ativo (preciso do preço atual).</span>`;
+    return;
+  }
+  simCloseQty(pos, pos.qty, S.candles[S.candles.length - 1].c, 'manual');
+  S.sim.positions = S.sim.positions.filter(p => p.qty > 0);
+  saveSim(); renderSim();
+}
+
+function simReset() {
+  if (!confirm('Zerar a conta de simulação? Posições e histórico serão apagados e o saldo volta para 10.000.')) return;
+  S.sim = { balance: SIM_START, positions: [], history: [], diary: [] };
+  saveSim(); renderSim();
+}
+
+function renderSim() {
+  const sim = S.sim;
+  const lastPrice = S.candles.length ? S.candles[S.candles.length - 1].c : null;
+
+  // P&L aberto em tempo real: preço em tela para o ativo atual e cotação
+  // ao vivo (ticker, a cada 15s) para todos os demais
+  const priceOf = p => (p.symbol === S.symbol && lastPrice != null) ? lastPrice : ((S.live && S.live[p.symbol]) || null);
+  let openPnl = 0, openPnlKnown = true;
+  for (const p of sim.positions) {
+    const lp = priceOf(p);
+    if (lp != null) openPnl += (p.side === 'compra' ? lp - p.entry : p.entry - lp) * p.qty;
+    else openPnlKnown = false;
+  }
+  const equity = sim.balance + openPnl;
+  const avgPnl = sim.positions.length ? openPnl / sim.positions.length : null;
+  if (openPnlKnown) recordEquity(equity);
+
+  const closed = sim.history;
+  const wins = closed.filter(h => h.pnl > 0).length;
+  const winRate = closed.length ? (wins / closed.length * 100) : null;
+  const totalPnl = sim.balance - SIM_START + (sim.positions.length === 0 ? 0 : 0);
+  const avgR = closed.length ? closed.reduce((s, h) => s + h.r, 0) / closed.length : null;
+  const pnlCls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+  const cur = S.market === 'b3' ? 'b3' : 'crypto';
+
+  $('simStats').innerHTML = `
+    <div class="sim-stat"><div class="k">Saldo (realizado)</div><div class="v ${pnlCls(sim.balance - SIM_START)}">${moneyFor(cur, sim.balance)}</div></div>
+    <div class="sim-stat"><div class="k">Resultado total</div><div class="v ${pnlCls(totalPnl)}">${totalPnl >= 0 ? '+' : ''}${moneyFor(cur, totalPnl)} (${(totalPnl / SIM_START * 100).toFixed(2)}%)</div></div>
+    <div class="sim-stat"><div class="k">P&L aberto${openPnlKnown ? '' : ' *'}</div><div class="v ${pnlCls(openPnl)}">${sim.positions.length ? (openPnl >= 0 ? '+' : '') + moneyFor(cur, openPnl) : '—'}</div></div>
+    <div class="sim-stat"><div class="k">P&L médio/posição</div><div class="v ${pnlCls(avgPnl || 0)}">${avgPnl != null ? (avgPnl >= 0 ? '+' : '') + moneyFor(cur, avgPnl) : '—'}</div></div>
+    <div class="sim-stat"><div class="k">Patrimônio agora</div><div class="v ${pnlCls(equity - SIM_START)}">${moneyFor(cur, equity)}</div></div>
+    <div class="sim-stat"><div class="k">Operações fechadas</div><div class="v">${closed.length}</div></div>
+    <div class="sim-stat"><div class="k">Taxa de acerto</div><div class="v ${winRate == null ? '' : winRate >= 50 ? 'up' : 'down'}">${winRate == null ? '—' : winRate.toFixed(0) + '%'}</div></div>
+    <div class="sim-stat"><div class="k">R médio por trade</div><div class="v ${avgR == null ? '' : pnlCls(avgR)}">${avgR == null ? '—' : (avgR >= 0 ? '+' : '') + avgR.toFixed(2) + 'R'}</div></div>
+  ` + (openPnlKnown ? '' : '<div class="sim-stat" style="grid-column:1/-1"><div class="k">* P&L aberto parcial</div><div style="font-size:11px;color:var(--muted);line-height:1.5">Aguardando a cotação ao vivo de algum ativo (atualiza a cada 15s). Lembre: a execução de stop/alvos continua acontecendo pela análise de candles de cada ativo.</div></div>')
+  + (sim.lockUntil && Date.now() < sim.lockUntil ? `<div class="sim-stat" style="grid-column:1/-1"><div class="k">🛡 Trava anti-revenge ativa</div><div style="font-size:11px;color:var(--yellow);line-height:1.5">Stop recente: novas entradas liberadas em ${Math.ceil((sim.lockUntil - Date.now()) / 60000)} min. Pausa faz parte do método.</div></div>` : '');
+
+  // posições abertas
+  if (!sim.positions.length) {
+    $('simPositions').innerHTML = '<div class="sim-empty">Nenhuma posição aberta.</div>';
+  } else {
+    $('simPositions').innerHTML = `<div style="overflow-x:auto"><table class="sim-table">
+      <tr><th>Ativo</th><th>Lado</th><th>Qtd</th><th>Entrada</th><th>Stop</th><th>Alvo 1</th><th>Alvo 2</th><th>P&L agora</th><th></th></tr>
+      ${sim.positions.map(p => {
+        const lp = priceOf(p);
+        const pnl = lp != null ? (p.side === 'compra' ? lp - p.entry : p.entry - lp) * p.qty : null;
+        return `<tr>
+          <td>${p.symbol} <span style="color:var(--muted)">${p.tf}</span></td>
+          <td><span class="badge-side ${p.side === 'compra' ? 'buy' : 'sell'}">${p.side === 'compra' ? 'COMPRA' : 'VENDA'}</span></td>
+          <td>${fmtQty(p.qty)}</td>
+          <td>${formatPrice(p.entry)}</td>
+          <td class="down">${formatPrice(p.stop)}${p.halfTaken ? ' <span style="color:var(--muted)">(0x0)</span>' : ''}</td>
+          <td class="up">${p.halfTaken ? '✓ feito' : formatPrice(p.t1)}</td>
+          <td class="up">${formatPrice(p.t2)}</td>
+          <td class="${pnl == null ? '' : pnlCls(pnl)}">${pnl == null ? 'aguardando cotação…' : (pnl >= 0 ? '+' : '') + moneyFor(p.market, pnl)}</td>
+          <td><button class="btn mini ghost" data-close="${p.id}">Fechar</button></td>
+        </tr>`;
+      }).join('')}
+    </table></div>`;
+  }
+
+  // histórico
+  if (!closed.length) {
+    $('simHistory').innerHTML = '<div class="sim-empty">Nenhuma operação fechada ainda. Sua taxa de acerto aparecerá aqui.</div>';
+  } else {
+    $('simHistory').innerHTML = `<div style="overflow-x:auto;max-height:320px;overflow-y:auto"><table class="sim-table">
+      <tr><th>Data</th><th>Ativo</th><th>Lado</th><th>Qtd</th><th>Entrada</th><th>Saída</th><th>Motivo</th><th>Resultado</th><th>R</th></tr>
+      ${closed.slice(0, 60).map(h => `<tr>
+        <td>${new Date(h.closedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+        <td>${h.symbol}</td>
+        <td><span class="badge-side ${h.side === 'compra' ? 'buy' : 'sell'}">${h.side === 'compra' ? 'C' : 'V'}</span></td>
+        <td>${fmtQty(h.qty)}</td>
+        <td>${formatPrice(h.entry)}</td>
+        <td>${formatPrice(h.exit)}</td>
+        <td style="color:var(--muted)">${h.reason}</td>
+        <td class="${pnlCls(h.pnl)}">${h.pnl >= 0 ? '+' : ''}${moneyFor(h.market, h.pnl)}</td>
+        <td class="${pnlCls(h.r)}">${h.r >= 0 ? '+' : ''}${h.r.toFixed(2)}R</td>
+      </tr>`).join('')}
+    </table></div>`;
+  }
+}
+
+S.sim = loadSim();
+$('btnAutoScan').addEventListener('click', () => autoTick(true));
+$('btnResetSim').addEventListener('click', simReset);
+$('simPositions').addEventListener('click', e => {
+  const b = e.target.closest('[data-close]'); if (!b) return;
+  simManualClose(+b.dataset.close);
+});
+
+/* ============================== radar de oportunidades ============================== */
+async function scanMarket() {
+  const btn = $('btnScan');
+  btn.disabled = true; btn.textContent = 'escaneando…';
+  const tf = TF_CRYPTO.includes(S.tf) ? S.tf : '15m';
+  const htfName = HTF_MAP[tf];
+  const tasks = PICKS_CRYPTO.map(async sym => {
+    const [cs, csH] = await Promise.all([
+      fetchCrypto(sym, tf),
+      htfName ? fetchCrypto(sym, htfName).catch(() => null) : Promise.resolve(null),
+    ]);
+    if (cs.length < 60) throw new Error('poucos dados');
+    const res = analyzeSignals(cs);
+    const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+    if (htfInfo) applyHtfGate(res, htfInfo, tf, htfName);
+    return { sym, price: cs[cs.length - 1].c, res, htfInfo, bt: backtest(cs) };
+  });
+  const settled = await Promise.allSettled(tasks);
+  const rows = settled.filter(s => s.status === 'fulfilled').map(s => s.value);
+  // sinais acionáveis primeiro, depois pela força do placar
+  rows.sort((a, b) => ((b.res.cls !== 'neutral') - (a.res.cls !== 'neutral')) || Math.abs(b.res.score) - Math.abs(a.res.score));
+  renderRadar(rows, tf, htfName, settled.length - rows.length);
+  btn.disabled = false; btn.textContent = 'Escanear agora';
+}
+
+function renderRadar(rows, tf, htfName, fails) {
+  if (!rows.length) {
+    $('radarBody').innerHTML = '<div class="sim-empty">Não consegui escanear agora — verifique a conexão e tente de novo.</div>';
+    return;
+  }
+  $('radarBody').innerHTML = `<div style="overflow-x:auto"><table class="sim-table">
+    <tr><th>Ativo</th><th>Preço</th><th>Sinal (${tf})</th><th>Força</th><th>Tend. ${tf}</th><th>Tend. ${htfName}</th><th>Backtest</th></tr>
+    ${rows.map(r => {
+      const v = r.res.cls === 'buy' ? 'buy' : r.res.cls === 'sell' ? 'sell' : 'neutral';
+      const btTxt = r.bt.n ? `${r.bt.avgR >= 0 ? '+' : ''}${r.bt.avgR.toFixed(2)}R ×${r.bt.n}` : '—';
+      const btCls = r.bt.n ? (r.bt.avgR >= 0 ? 'up' : 'down') : '';
+      return `<tr data-sym="${r.sym}" style="cursor:pointer">
+        <td><b>${r.sym.replace('USDT','')}</b></td>
+        <td>${formatPrice(r.price)}</td>
+        <td><span class="vote ${v}">${r.res.label}</span></td>
+        <td class="${r.res.score > 0 ? 'up' : r.res.score < 0 ? 'down' : ''}">${r.res.score > 0 ? '+' : ''}${r.res.score}</td>
+        <td>${r.res.trendTxt}</td>
+        <td>${r.htfInfo ? r.htfInfo.txt : '—'}</td>
+        <td class="${btCls}">${btTxt}</td>
+      </tr>`;
+    }).join('')}
+  </table></div>
+  <div class="plan-note">Toque numa linha para abrir a análise completa do ativo. Backtest = R médio × nº de trades na janela; prefira ativos com R médio positivo.${fails ? ` (${fails} ativo(s) falharam no escaneamento.)` : ''} Atualizado às ${new Date().toLocaleTimeString('pt-BR')}.</div>`;
+}
+
+$('btnScan').addEventListener('click', scanMarket);
+$('radarBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-sym]'); if (!tr) return;
+  if (S.market !== 'crypto') {
+    document.querySelector('#segMarket button[data-m="crypto"]').click();
+  }
+  S.symbol = tr.dataset.sym; $('symbolInput').value = S.symbol; renderPicks(); analyze();
+});
+
+/* ============================== modo Claude: piloto automático ============================== */
+const AUTO_TF = '15m';
+const AUTO_HTF = HTF_MAP[AUTO_TF];
+const AUTO_DAY = '4h'; // a "maré do dia" — v3 só opera na direção dela
+const AUTO_INTERVAL_MIN = 2;
+const AUTO_MAX_POS = 6;
+const AUTO_RISK = 3;
+const AUTO_MIN_SCORE = 12;
+const AUTO_MIN_ADX = 14;
+const AUTO_MIN_BT = 5;
+
+let autoBusy = false, nextScanAt = 0, lastScanMsg = 'iniciando…';
+
+function logDiary(kind, txt) {
+  if (!S.sim.diary) S.sim.diary = [];
+  S.sim.diary.unshift({ t: Date.now(), kind, txt });
+  S.sim.diary = S.sim.diary.slice(0, 100);
+  saveSim(); renderDiary();
+}
+
+function renderDiary() {
+  const d = S.sim.diary || [];
+  const icon = { open: '▶', win: '✅', loss: '❌', info: '💬' };
+  $('diaryBody').innerHTML = d.length
+    ? d.map(e => `<div class="diary-item"><span class="diary-time">${new Date(e.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> ${icon[e.kind] || '·'} ${e.txt}</div>`).join('')
+    : '<div class="sim-empty">Ainda não tomei nenhuma decisão. A primeira análise acontece segundos depois de a página abrir — e cada decisão (inclusive as recusas) aparecerá aqui, explicada.</div>';
+}
+
+function autoOpen(c, side) {
+  const last = c.cs[c.cs.length - 1].c;
+  const a = c.res.atr || last * 0.005;
+  const stop = side === 'compra' ? last - 1.5 * a : last + 1.5 * a;
+  const perUnit = Math.abs(last - stop);
+  if (perUnit <= 0) return false;
+  // correção v3: o risco por unidade embute as taxas de ida e volta, para que
+  // um stop custe ~1R de verdade (no v2 a perda média era −1,29R); os alvos
+  // são medidos sobre esse mesmo risco efetivo, mantendo 1:1,5 e 1:2,5 líquidos
+  const feePerUnit = (last + stop) * SIM_FEE;
+  const riskEff = perUnit + feePerUnit;
+  const t1 = side === 'compra' ? last + 1.5 * riskEff : last - 1.5 * riskEff;
+  const t2 = side === 'compra' ? last + 2.5 * riskEff : last - 2.5 * riskEff;
+  const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
+  const free = S.sim.balance * 3 - allocated; // alavancagem simulada de 3×
+  if (free <= 0) return false;
+  let qty = (S.sim.balance * AUTO_RISK / 100) / riskEff;
+  // espalha o capital: cada posição usa no máximo 1/6 do teto de 3×
+  const perPosCap = S.sim.balance * 3 / AUTO_MAX_POS;
+  if (qty * last > perPosCap) qty = perPosCap / last;
+  if (qty * last > free) qty = free / last;
+  if (qty <= 0) return false;
+  S.sim.positions.push({
+    id: Date.now() + Math.floor(Math.random() * 1000), symbol: c.sym, market: 'crypto', tf: AUTO_TF,
+    side, qty, entry: last, stop, t1, t2, riskPerUnit: riskEff, halfTaken: false, openedAt: Date.now(),
+  });
+  saveSim(); renderSim();
+  logDiary('open', `Abri <b>${side.toUpperCase()} em ${c.sym}</b> a ${formatPrice(last)}. Por quê: força ${c.res.score > 0 ? '+' : ''}${c.res.score}, ${AUTO_TF} em ${c.res.trendTxt}, ${AUTO_HTF} em ${c.htfInfo.txt}, 4h em ${c.dayInfo.txt}, ADX ${c.res.adxV.toFixed(0)}, backtest ${(c.bt.avgR >= 0 ? '+' : '') + c.bt.avgR.toFixed(2)}R ×${c.bt.n}. Stop ${formatPrice(stop)} · alvos ${formatPrice(t1)} / ${formatPrice(t2)} · risco ${AUTO_RISK}% (taxas embutidas no R).`);
+  return true;
+}
+
+async function autoTick(manual) {
+  if (autoBusy) return;
+  autoBusy = true;
+  updateAutoStatus();
+  try {
+    // 1) gerencia as posições abertas (stop/alvos de cada ativo)
+    for (const sym of [...new Set(S.sim.positions.map(p => p.symbol))]) {
+      try {
+        const cs = await fetchCrypto(sym, AUTO_TF);
+        const before = S.sim.history.length;
+        simUpdate(sym, cs);
+        for (const h of S.sim.history.slice(0, S.sim.history.length - before)) {
+          logDiary(h.pnl >= 0 ? 'win' : 'loss', `Fechei ${h.side} em <b>${h.symbol}</b> (${h.reason}): ${h.pnl >= 0 ? '+' : ''}${moneyFor(h.market, h.pnl)} (${h.r >= 0 ? '+' : ''}${h.r.toFixed(2)}R).`);
+        }
+      } catch (e) {}
+    }
+    // 2) procura entradas novas dentro dos critérios
+    let opened = 0;
+    const skipped = [];
+    if (S.sim.lockUntil && Date.now() < S.sim.lockUntil) {
+      lastScanMsg = 'trava anti-revenge ativa — sem novas entradas por enquanto';
+    } else if (S.sim.positions.length >= AUTO_MAX_POS) {
+      lastScanMsg = `carteira cheia (${S.sim.positions.length}/${AUTO_MAX_POS}) — só gerenciando as posições`;
+    } else {
+      const settled = await Promise.allSettled(PICKS_CRYPTO.map(async sym => {
+        const [cs, csH, csD] = await Promise.all([
+          fetchCrypto(sym, AUTO_TF),
+          fetchCrypto(sym, AUTO_HTF).catch(() => null),
+          fetchCrypto(sym, AUTO_DAY).catch(() => null),
+        ]);
+        if (cs.length < 60) throw new Error('poucos dados');
+        const res = analyzeSignals(cs);
+        const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+        const dayInfo = (csD && csD.length > 60) ? trendOf(csD) : null;
+        if (htfInfo) applyHtfGate(res, htfInfo, AUTO_TF, AUTO_HTF);
+        return { sym, cs, res, htfInfo, dayInfo, bt: backtest(cs) };
+      }));
+      const rows = settled.filter(s => s.status === 'fulfilled').map(s => s.value);
+      const picks = rows.filter(r => {
+        if (r.res.cls === 'neutral') return false;
+        if (Math.abs(r.res.score) < AUTO_MIN_SCORE) { skipped.push(`${r.sym}: força ${r.res.score} abaixo de ±${AUTO_MIN_SCORE}`); return false; }
+        // correção v3: tendência PLENA no 1h ("moderada" não basta) — os 5 shorts
+        // perdedores do v2 entraram em pullbacks moderados do 1h dentro de alta maior
+        const aligned = r.htfInfo && Math.abs(r.htfInfo.dir) >= 1 &&
+          ((r.res.cls === 'buy' && r.htfInfo.dir > 0) || (r.res.cls === 'sell' && r.htfInfo.dir < 0));
+        if (!aligned) { skipped.push(`${r.sym}: ${AUTO_HTF} em "${r.htfInfo ? r.htfInfo.txt : '—'}" — v3 exige tendência plena a favor`); return false; }
+        // correção v3: a maré do dia (4h) precisa apontar na mesma direção
+        const dayOk = r.dayInfo && (r.res.cls === 'buy' ? r.dayInfo.dir >= 0.5 : r.dayInfo.dir <= -0.5);
+        if (!dayOk) { skipped.push(`${r.sym}: 4h em "${r.dayInfo ? r.dayInfo.txt : '—'}" — só opero a favor do dia`); return false; }
+        if (r.res.adxV == null || r.res.adxV < AUTO_MIN_ADX) { skipped.push(`${r.sym}: ADX ${r.res.adxV == null ? '—' : r.res.adxV.toFixed(0)} abaixo de ${AUTO_MIN_ADX}`); return false; }
+        if (r.bt.n >= 3 && r.bt.avgR <= 0) { skipped.push(`${r.sym}: backtest negativo (${(r.bt.avgR >= 0 ? '+' : '') + r.bt.avgR.toFixed(2)}R ×${r.bt.n}) neste ativo`); return false; }
+        return true;
+      }).sort((a, b) => Math.abs(b.res.score) - Math.abs(a.res.score));
+      for (const c of picks) {
+        if (S.sim.positions.length >= AUTO_MAX_POS) break;
+        const side = c.res.cls === 'buy' ? 'compra' : 'venda';
+        if (S.sim.positions.some(p => p.symbol === c.sym)) continue;
+        if (S.sim.positions.filter(p => p.side === side).length >= 4) { skipped.push(`${c.sym}: já tenho 4 posições de ${side} — exposição direcional no limite`); continue; }
+        if (autoOpen(c, side)) opened++;
+      }
+      lastScanMsg = opened
+        ? `abri ${opened} posição(ões) nesta análise`
+        : `${rows.length} criptos analisadas — nenhuma passou em todos os critérios`;
+      if (!opened && manual && skipped.length) {
+        logDiary('info', `Análise manual: nada passou nos meus critérios. Motivos: ${skipped.slice(0, 4).join(' · ')}${skipped.length > 4 ? ' · …' : ''}`);
+      }
+    }
+  } finally {
+    autoBusy = false;
+    nextScanAt = Date.now() + AUTO_INTERVAL_MIN * 60000;
+    updateAutoStatus();
+  }
+}
+
+function updateAutoStatus() {
+  const el = $('autoStatus');
+  if (!el) return;
+  if (autoBusy) { el.textContent = '🤖 analisando o mercado…'; return; }
+  const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+  el.textContent = `🤖 ${lastScanMsg} · próxima análise em ${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
+}
+
+/* ============================== histórico do patrimônio ============================== */
+function recordEquity(equity) {
+  try {
+    const k = 'eqhist_' + SIM_KEY;
+    const h = JSON.parse(localStorage.getItem(k) || '[]');
+    const last = h[h.length - 1];
+    if (last && Date.now() - last.t < 15 * 60000) return;
+    h.push({ t: Date.now(), e: Math.round(equity * 100) / 100 });
+    if (h.length > 3000) h.splice(0, h.length - 3000);
+    localStorage.setItem(k, JSON.stringify(h));
+  } catch (e) {}
+}
+
+/* ============================== cotações ao vivo ============================== */
+// busca o preço atual de todos os ativos com posição aberta (endpoint leve
+// da Binance) para o P&L em tempo real; a execução de stop/alvos continua
+// sendo feita pelos candles (simUpdate)
+async function refreshLivePrices() {
+  const syms = [...new Set(S.sim.positions.filter(p => p.market === 'crypto').map(p => p.symbol))];
+  if (!syms.length) return;
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=' + encodeURIComponent(JSON.stringify(syms)));
+    if (!r.ok) return;
+    const j = await r.json();
+    S.live = S.live || {};
+    for (const t of j) S.live[t.symbol] = +t.price;
+    renderSim();
+  } catch (e) {}
+}
+setInterval(refreshLivePrices, 15000);
+
+/* ============================== fluxo principal ============================== */
+async function analyze(silent) {
+  const sym = $('symbolInput').value.trim().toUpperCase();
+  if (!sym) return;
+  S.symbol = sym; renderPicks();
+  if (!silent) setStatus('loading', 'buscando dados…');
+  showError('');
+  try {
+    // busca o tempo gráfico atual e o tempo maior (filtro de tendência) em paralelo
+    const htfName = S.market === 'crypto' ? HTF_MAP[S.tf] : null;
+    let cs, csH = null;
+    if (S.market === 'crypto') {
+      [cs, csH] = await Promise.all([
+        fetchCrypto(sym, S.tf),
+        htfName ? fetchCrypto(sym, htfName).catch(() => null) : Promise.resolve(null),
+      ]);
+    } else {
+      cs = await fetchB3(sym, S.tf);
+    }
+    if (cs.length < 60) throw new Error('Poucos dados para análise confiável (mínimo 60 candles).');
+    S.candles = cs;
+
+    const res = analyzeSignals(cs);
+
+    // filtro multi-tempo: sinal contra a tendência do tempo maior é bloqueado
+    const htfInfo = (csH && csH.length > 60) ? trendOf(csH) : null;
+    if (htfInfo) applyHtfGate(res, htfInfo, S.tf, htfName);
+    $('htfTxt').textContent = htfInfo ? `${htfInfo.txt} (${htfName})` : (S.market === 'b3' ? 'indisponível na B3' : '—');
+    $('htfTxt').style.color = htfInfo && htfInfo.dir > 0 ? 'var(--green)' : htfInfo && htfInfo.dir < 0 ? 'var(--red)' : 'var(--yellow)';
+
+    // backtest da estratégia na janela carregada
+    const bt = backtest(cs);
+    $('btMeta').textContent = `${cs.length} candles · ${S.tf}`;
+    if (!bt.n) {
+      $('btStats').innerHTML = '<div class="sim-empty">Nenhum trade gerado nesta janela — os filtros não liberaram entradas (ou há poucos dados).</div>';
+    } else {
+      const cTot = bt.totalR > 0 ? 'up' : bt.totalR < 0 ? 'down' : 'flat';
+      $('btStats').innerHTML = `
+        <div class="sim-stat"><div class="k">Trades</div><div class="v">${bt.n}</div></div>
+        <div class="sim-stat"><div class="k">Acerto</div><div class="v ${bt.winRate >= 50 ? 'up' : 'down'}">${bt.winRate.toFixed(0)}%</div></div>
+        <div class="sim-stat"><div class="k">Total</div><div class="v ${cTot}">${bt.totalR >= 0 ? '+' : ''}${bt.totalR.toFixed(1)}R</div></div>
+        <div class="sim-stat"><div class="k">R médio</div><div class="v ${bt.avgR >= 0 ? 'up' : 'down'}">${bt.avgR >= 0 ? '+' : ''}${bt.avgR.toFixed(2)}R</div></div>`;
+    }
+    const last = cs[cs.length - 1], prev = cs[cs.length - 2];
+    const chg = (last.c - prev.c) / prev.c * 100;
+
+    $('priceBig').textContent = formatPrice(last.c);
+    $('priceBig').className = 'price-big ' + (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat');
+    $('priceChg').textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% no candle`;
+    $('priceChg').className = 'price-chg ' + (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat');
+    $('priceMeta').textContent = `${sym} · ${S.tf} · ${S.market === 'crypto' ? 'Binance' : 'brapi/B3'}`;
+
+    $('signalLabel').textContent = res.label;
+    $('signalLabel').className = 'signal-label ' + res.cls;
+    $('signalSub').textContent = res.sub;
+    $('signalTime').textContent = new Date().toLocaleTimeString('pt-BR');
+    $('gaugePin').style.left = `${(res.score + 100) / 2}%`;
+    $('trendTxt').textContent = res.trendTxt;
+    $('trendTxt').style.color = /ALTA|Alta/.test(res.trendTxt) ? 'var(--green)' : /BAIXA|Baixa/.test(res.trendTxt) ? 'var(--red)' : 'var(--yellow)';
+    $('scoreTxt').textContent = `${res.score > 0 ? '+' : ''}${res.score} / 100`;
+    $('atrTxt').textContent = res.atr ? `${formatPrice(res.atr)} (${(res.atr / last.c * 100).toFixed(2)}% por candle)` : '—';
+
+    renderIndicators(res);
+    buildPlan(res, cs);
+    drawChart(cs, res);
+    simUpdate(sym, cs);
+
+    const fmtL = v => formatPrice(v);
+    $('srList').innerHTML =
+      (res.piv.res.length ? `Resistências: ${res.piv.res.map(v => `<b class="res">${fmtL(v)}</b>`).join(' · ')}` : '') +
+      (res.piv.res.length && res.piv.sup.length ? ' &nbsp;|&nbsp; ' : '') +
+      (res.piv.sup.length ? `Suportes: ${res.piv.sup.map(v => `<b class="sup">${fmtL(v)}</b>`).join(' · ')}` : '');
+
+    setStatus('online', `atualizado ${new Date().toLocaleTimeString('pt-BR')}`);
+    scheduleRefresh();
+  } catch (err) {
+    setStatus('error', 'erro');
+    showError('<b>Não consegui buscar/analisar:</b> ' + err.message);
+  }
+}
+
+window.addEventListener('resize', () => { if (S.candles.length) analyze(true); });
+
+renderTf(); renderPicks(); renderSim(); renderDiary(); refreshLivePrices();
+analyze();
+autoTick();
+setInterval(autoTick, AUTO_INTERVAL_MIN * 60000);
+setInterval(updateAutoStatus, 1000);
+</script>
+</body>
+</html>
