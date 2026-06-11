@@ -1153,10 +1153,11 @@ function simOpen() {
   const allocated = S.sim.positions.reduce((s, p) => s + p.qty * p.entry, 0);
   const free = S.sim.balance * 3 - allocated;
   if (free <= 0) {
-    hint.innerHTML = '<span class="down">Todo o saldo já está alocado em posições abertas. Feche alguma posição antes de abrir outra.</span>';
+    hint.innerHTML = `<span class="down">Limite de capital atingido: ${moneyFor(S.market, allocated)} já posicionados (teto: ${moneyFor(S.market, S.sim.balance * 3)} = 3× o saldo). Não é o risco % que bloqueia — é o tamanho das posições: stop justo exige posição grande. Feche alguma posição ou use um tempo gráfico maior (stop mais largo ocupa menos capital).</span>`;
     return;
   }
-  let qty = (S.sim.balance * rp / 100) / perUnit;
+  const qtyRisk = (S.sim.balance * rp / 100) / perUnit;
+  let qty = qtyRisk;
   if (qty * S.plan.entry > free) qty = free / S.plan.entry;
   if (qty <= 0) {
     hint.innerHTML = '<span class="down">Saldo insuficiente. Zere a conta para recomeçar.</span>';
@@ -1172,7 +1173,9 @@ function simOpen() {
   };
   S.sim.positions.push(pos);
   saveSim(); renderSim();
-  hint.innerHTML = `<span class="up">Posição aberta: ${pos.side.toUpperCase()} ${fmtQty(qty)} ${pos.symbol}. O stop e os alvos serão monitorados automaticamente a cada atualização.</span>`;
+  const effRisk = qty * perUnit / S.sim.balance * 100;
+  hint.innerHTML = `<span class="up">Posição aberta: ${pos.side.toUpperCase()} ${fmtQty(qty)} ${pos.symbol}. O stop e os alvos serão monitorados automaticamente a cada atualização.</span>` +
+    (qty < qtyRisk * 0.999 ? ` <span style="color:var(--yellow)">Posição limitada pelo capital livre: risco efetivo ≈ ${effRisk.toFixed(2)}% (pedido: ${rp}%). Stop mais largo (tempo gráfico maior) = posições menores = mais entradas simultâneas.</span>` : '');
 }
 
 function simCloseQty(pos, qty, price, reason) {
