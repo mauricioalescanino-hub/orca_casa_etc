@@ -156,6 +156,14 @@ canvas { display: block; width: 100%; }
 .vote.sell { color: var(--red); background: var(--red-dim); }
 .vote.neutral { color: var(--yellow); background: var(--yellow-dim); }
 .ind-expl { color: var(--muted); line-height: 1.5; font-size: 12px; padding-top: 4px; }
+/* indicadores recolhíveis — agrupa a lista longa atrás de uma seta */
+details.ind-collapse > summary { cursor: pointer; list-style: none; user-select: none; }
+details.ind-collapse > summary::-webkit-details-marker { display: none; }
+details.ind-collapse > summary .ind-hint { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .04em; color: var(--muted); margin-left: auto; }
+details.ind-collapse > summary::after { content: '▾'; color: var(--accent); font-size: 13px; margin-left: 8px; transition: transform .2s; }
+details.ind-collapse[open] > summary::after { transform: rotate(180deg); }
+details.ind-collapse[open] > summary .ind-hint { display: none; }
+details.ind-collapse:not([open]) > summary { border-bottom: none; }
 
 /* ---------- guia ---------- */
 details.guide { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-top: 18px; }
@@ -316,12 +324,12 @@ details.guide[open] summary::before { transform: rotate(90deg); }
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-head"><span class="card-title">Indicadores · o que cada um diz</span></div>
+      <details class="card ind-collapse">
+        <summary class="card-head"><span class="card-title">Indicadores · o que cada um diz</span><span class="ind-hint">ver detalhes</span></summary>
         <table class="ind-table" id="indTable">
           <tr><td colspan="3" style="color:var(--muted)">Sem dados ainda.</td></tr>
         </table>
-      </div>
+      </details>
     </div>
   </div>
 
