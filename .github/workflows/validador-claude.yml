@@ -1,0 +1,31 @@
+name: Validador Claude Conservador
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # a cada 30 min (estratégia de 1h — folgado). Ajuste se quiser.
+  workflow_dispatch: {}       # botão "Run workflow" na aba Actions, para testar na hora
+
+# nenhuma permissão de escrita no repo: o estado vive num Gist, não em commits
+permissions:
+  contents: read
+
+concurrency:
+  group: validador-claude     # nunca rodar duas execuções ao mesmo tempo
+  cancel-in-progress: false
+
+jobs:
+  validador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Rodar validador (paper)
+        run: node robo/validador-claude.js
+        env:
+          STATE_GIST_ID: ${{ secrets.VALIDADOR_GIST_ID }}
+          GH_GIST_TOKEN: ${{ secrets.VALIDADOR_GIST_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
